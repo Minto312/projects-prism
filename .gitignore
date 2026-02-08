@@ -2,8 +2,24 @@
 node_modules/
 
 # Build output
+dist/
+
+# Tauri
 src-tauri/target/
 
 # Environment
 .env
 .env.*
+!.env.example
+
+# IDE
+.vscode/
+!.vscode/extensions.json
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
