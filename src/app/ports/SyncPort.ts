@@ -40,7 +40,7 @@ export interface SyncPort {
   /**
    * コンフリクトを解決（操作を再試行）
    */
-  resolveConflictWithOperation(operationId: string): Promise<void>;
+  resolveConflictWithOperation(operationId: string, currentOptionId: string): Promise<void>;
 
   /**
    * 操作をキャンセル

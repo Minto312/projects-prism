@@ -71,5 +71,10 @@ pub trait PersistencePort: Send + Sync {
         status: &OperationStatus,
         error_message: Option<&str>,
     ) -> Result<(), DomainError>;
+    fn update_operation_precondition(
+        &self,
+        operation_id: &str,
+        expected_from_option_id: &str,
+    ) -> Result<(), DomainError>;
     fn delete_operation(&self, operation_id: &str) -> Result<(), DomainError>;
 }

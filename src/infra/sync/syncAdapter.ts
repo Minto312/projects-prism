@@ -81,8 +81,8 @@ export class SyncAdapter implements SyncPort {
     useConflictStore.getState().resolveConflict(operationId);
   }
 
-  async resolveConflictWithOperation(operationId: string): Promise<void> {
-    await syncApi.resolveConflictWithOperation(operationId);
+  async resolveConflictWithOperation(operationId: string, currentOptionId: string): Promise<void> {
+    await syncApi.resolveConflictWithOperation(operationId, currentOptionId);
 
     // 操作を pending に戻す
     useOpQueueStore.getState().updateOperation(operationId, {

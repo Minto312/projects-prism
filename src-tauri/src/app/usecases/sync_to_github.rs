@@ -80,13 +80,30 @@ impl SyncToGitHubUseCase {
                         }
                     } else {
                         // precondition NG → conflict
-                        // option 名を取得する（ベストエフォート）
-                        let current_option_name = current_id.clone();
+                        // option 名をキャッシュから取得する（ベストエフォート）
+                        let current_option_name = persistence
+                            .get_all_status_options()
+                            .ok()
+                            .and_then(|opts| {
+                                opts.into_iter()
+                                    .find(|o| o.id == current_id)
+                                    .map(|o| o.name)
+                            })
+                            .unwrap_or_else(|| current_id.clone());
 
                         persistence.update_operation_status(
                             &op.id,
                             &OperationStatus::Conflict,
                             None,
+                        )?;
+                        // コンフリクト情報を永続化
+                        persistence.set_setting(
+                            &format!("conflict_current_option_id:{}", op.id),
+                            &current_id,
+                        )?;
+                        persistence.set_setting(
+                            &format!("conflict_current_option_name:{}", op.id),
+                            &current_option_name,
                         )?;
                         op.status = OperationStatus::Conflict;
 
@@ -214,6 +231,7 @@ impl SyncToGitHubUseCase {
             &OperationStatus::Completed,
             None,
         )?;
+        Self::cleanup_conflict_settings(persistence, operation_id);
         Ok(())
     }
 
@@ -221,14 +239,16 @@ impl SyncToGitHubUseCase {
     pub fn resolve_conflict_with_operation(
         persistence: &dyn PersistencePort,
         operation_id: &str,
+        current_option_id: &str,
     ) -> Result<(), DomainError> {
-        // precondition を更新せず pending に戻す
-        // 次回 sync 時に再度 precondition チェックが走る
+        // precondition を現在のリモート値に更新してから pending に戻す
+        persistence.update_operation_precondition(operation_id, current_option_id)?;
         persistence.update_operation_status(
             operation_id,
             &OperationStatus::Pending,
             None,
         )?;
+        Self::cleanup_conflict_settings(persistence, operation_id);
         Ok(())
     }
 
@@ -237,7 +257,13 @@ impl SyncToGitHubUseCase {
         persistence: &dyn PersistencePort,
         operation_id: &str,
     ) -> Result<(), DomainError> {
+        Self::cleanup_conflict_settings(persistence, operation_id);
         persistence.delete_operation(operation_id)?;
         Ok(())
+    }
+
+    fn cleanup_conflict_settings(persistence: &dyn PersistencePort, operation_id: &str) {
+        let _ = persistence.delete_setting(&format!("conflict_current_option_id:{}", operation_id));
+        let _ = persistence.delete_setting(&format!("conflict_current_option_name:{}", operation_id));
     }
 }

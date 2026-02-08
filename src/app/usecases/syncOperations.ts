@@ -43,9 +43,10 @@ export async function resolveConflictWithCurrent(
  */
 export async function resolveConflictWithOperation(
   port: SyncPort,
-  operationId: string
+  operationId: string,
+  currentOptionId: string
 ): Promise<void> {
-  return port.resolveConflictWithOperation(operationId);
+  return port.resolveConflictWithOperation(operationId, currentOptionId);
 }
 
 /**

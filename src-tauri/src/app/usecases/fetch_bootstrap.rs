@@ -1,9 +1,27 @@
 use crate::app::dtos::{
-    BootstrapResponse, ConflictInfo, OperationStatus, ProjectBootstrapResponse,
+    BootstrapResponse, ConflictInfo, Operation, OperationStatus, ProjectBootstrapResponse,
 };
 use crate::app::ports::github_port::GitHubPort;
 use crate::app::ports::persistence_port::PersistencePort;
 use crate::domain::errors::DomainError;
+
+fn build_conflict_info(persistence: &dyn PersistencePort, op: Operation) -> ConflictInfo {
+    let current_option_id = persistence
+        .get_setting(&format!("conflict_current_option_id:{}", op.id))
+        .ok()
+        .flatten()
+        .unwrap_or_default();
+    let current_option_name = persistence
+        .get_setting(&format!("conflict_current_option_name:{}", op.id))
+        .ok()
+        .flatten()
+        .unwrap_or_default();
+    ConflictInfo {
+        operation: op,
+        current_option_id,
+        current_option_name,
+    }
+}
 
 pub struct FetchBootstrapUseCase;
 
@@ -22,11 +40,7 @@ impl FetchBootstrapUseCase {
 
         let conflicts = conflict_operations
             .into_iter()
-            .map(|op| ConflictInfo {
-                current_option_id: String::new(),
-                current_option_name: String::new(),
-                operation: op,
-            })
+            .map(|op| build_conflict_info(persistence, op))
             .collect();
 
         let current_user_login = persistence
@@ -102,11 +116,7 @@ impl FetchBootstrapUseCase {
 
         let conflicts = conflict_operations
             .into_iter()
-            .map(|op| ConflictInfo {
-                current_option_id: String::new(),
-                current_option_name: String::new(),
-                operation: op,
-            })
+            .map(|op| build_conflict_info(persistence, op))
             .collect();
 
         Ok(BootstrapResponse {
@@ -149,11 +159,7 @@ impl FetchBootstrapUseCase {
         for op in all_ops {
             match op.status {
                 OperationStatus::Conflict => {
-                    conflicts.push(ConflictInfo {
-                        current_option_id: String::new(),
-                        current_option_name: String::new(),
-                        operation: op,
-                    });
+                    conflicts.push(build_conflict_info(persistence, op));
                 }
                 _ => {
                     pending_operations.push(op);
@@ -211,11 +217,7 @@ impl FetchBootstrapUseCase {
         for op in all_ops {
             match op.status {
                 OperationStatus::Conflict => {
-                    conflicts.push(ConflictInfo {
-                        current_option_id: String::new(),
-                        current_option_name: String::new(),
-                        operation: op,
-                    });
+                    conflicts.push(build_conflict_info(persistence, op));
                 }
                 _ => {
                     pending_operations.push(op);

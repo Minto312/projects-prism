@@ -29,9 +29,14 @@ pub async fn resolve_conflict_with_current(
 pub async fn resolve_conflict_with_operation(
     state: State<'_, AppState>,
     operation_id: String,
+    current_option_id: String,
 ) -> Result<(), String> {
-    SyncToGitHubUseCase::resolve_conflict_with_operation(state.persistence.as_ref(), &operation_id)
-        .map_err(|e| e.to_string())
+    SyncToGitHubUseCase::resolve_conflict_with_operation(
+        state.persistence.as_ref(),
+        &operation_id,
+        &current_option_id,
+    )
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

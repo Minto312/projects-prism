@@ -56,7 +56,7 @@ export interface TauriCommands {
   /**
    * コンフリクトを解決（操作を再試行）
    */
-  resolve_conflict_with_operation: (args: { operationId: string }) => Promise<void>;
+  resolve_conflict_with_operation: (args: { operationId: string; currentOptionId: string }) => Promise<void>;
 
   /**
    * 操作をキャンセル
@@ -111,8 +111,8 @@ export const syncApi = {
   getSyncState: () => tauriInvoke('get_sync_state'),
   resolveConflictWithCurrent: (operationId: string) =>
     tauriInvoke('resolve_conflict_with_current', { operationId }),
-  resolveConflictWithOperation: (operationId: string) =>
-    tauriInvoke('resolve_conflict_with_operation', { operationId }),
+  resolveConflictWithOperation: (operationId: string, currentOptionId: string) =>
+    tauriInvoke('resolve_conflict_with_operation', { operationId, currentOptionId }),
   cancelOperation: (operationId: string) =>
     tauriInvoke('cancel_operation', { operationId }),
 };

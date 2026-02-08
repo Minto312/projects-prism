@@ -27,7 +27,7 @@ export interface UseSyncOperationsResult {
   statusIcon: 'success' | 'warning' | 'error' | 'loading';
   syncNow: () => Promise<SyncResult | null>;
   resolveConflictWithCurrent: (operationId: string) => Promise<void>;
-  resolveConflictWithOperation: (operationId: string) => Promise<void>;
+  resolveConflictWithOperation: (operationId: string, currentOptionId: string) => Promise<void>;
   cancelOperation: (operationId: string) => Promise<void>;
 }
 
@@ -68,8 +68,8 @@ export function useSyncOperations(): UseSyncOperationsResult {
 
   // コンフリクト解決（操作を再試行）
   const resolveWithOperationMutation = useMutation({
-    mutationFn: (operationId: string) =>
-      syncAdapter.resolveConflictWithOperation(operationId),
+    mutationFn: ({ operationId, currentOptionId }: { operationId: string; currentOptionId: string }) =>
+      syncAdapter.resolveConflictWithOperation(operationId, currentOptionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.sync.state() });
     },
@@ -97,8 +97,8 @@ export function useSyncOperations(): UseSyncOperationsResult {
   );
 
   const resolveConflictWithOperation = useCallback(
-    async (operationId: string) => {
-      await resolveWithOperationMutation.mutateAsync(operationId);
+    async (operationId: string, currentOptionId: string) => {
+      await resolveWithOperationMutation.mutateAsync({ operationId, currentOptionId });
     },
     [resolveWithOperationMutation]
   );

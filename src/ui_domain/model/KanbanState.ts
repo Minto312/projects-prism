@@ -110,6 +110,12 @@ export function moveTaskToColumn(
   toIndex: number
 ): KanbanState {
   const newColumns = state.columns.map((column) => {
+    if (fromColumnId === toColumnId && column.id === fromColumnId) {
+      // 同カラム内の並べ替え
+      const newTaskIds = column.taskIds.filter((id) => id !== taskId);
+      newTaskIds.splice(toIndex, 0, taskId);
+      return { ...column, taskIds: newTaskIds };
+    }
     if (column.id === fromColumnId) {
       // 移動元カラムからタスクを削除
       return {

@@ -571,6 +571,20 @@ impl PersistencePort for SqlitePersistence {
         Ok(())
     }
 
+    fn update_operation_precondition(
+        &self,
+        operation_id: &str,
+        expected_from_option_id: &str,
+    ) -> Result<(), DomainError> {
+        let conn = self.conn.lock().map_err(|e| DomainError::Persistence(e.to_string()))?;
+        conn.execute(
+            "UPDATE operations SET expected_from_option_id = ?1 WHERE id = ?2",
+            params![expected_from_option_id, operation_id],
+        )
+        .map_err(|e| DomainError::Persistence(e.to_string()))?;
+        Ok(())
+    }
+
     fn delete_operation(&self, operation_id: &str) -> Result<(), DomainError> {
         let conn = self.conn.lock().map_err(|e| DomainError::Persistence(e.to_string()))?;
         conn.execute(
