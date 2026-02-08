@@ -55,6 +55,11 @@ export function useMoveTask({
         return;
       }
 
+      // ロールバック用に元のインデックスを記録
+      const board = useBoardStore.getState().boards[projectId];
+      const fromColumn = board?.columns.find((c) => c.id === fromColumnId);
+      const originalIndex = fromColumn?.taskIds.indexOf(taskId) ?? 0;
+
       // 楽観的更新（UI上で即座に移動）
       moveTaskInBoard(projectId, taskId, fromColumnId, toColumnId, toIndex);
 
@@ -68,9 +73,9 @@ export function useMoveTask({
         const syncAdapter = getSyncAdapter();
         await syncAdapter.appendOperation(operationInput);
       } catch (error) {
-        // エラー時はロールバック
+        // エラー時はロールバック（元の位置に復元）
         console.error('Failed to append operation:', error);
-        moveTaskInBoard(projectId, taskId, toColumnId, fromColumnId, 0);
+        moveTaskInBoard(projectId, taskId, toColumnId, fromColumnId, originalIndex);
       }
     },
     [projectId, statusField, tasks, moveTaskInBoard]
@@ -84,6 +89,11 @@ export function useMoveTask({
       }
 
       const currentStatusOptionId = task.statusOptionId ?? '__no_status__';
+
+      // ロールバック用に元のインデックスを記録
+      const board = useBoardStore.getState().boards[projectId];
+      const fromColumn = board?.columns.find((c) => c.id === currentStatusOptionId);
+      const originalIndex = fromColumn?.taskIds.indexOf(task.id) ?? 0;
 
       // 楽観的更新
       moveTaskInBoard(
@@ -104,14 +114,14 @@ export function useMoveTask({
         const syncAdapter = getSyncAdapter();
         await syncAdapter.appendOperation(operationInput);
       } catch (error) {
-        // エラー時はロールバック
+        // エラー時はロールバック（元の位置に復元）
         console.error('Failed to append operation:', error);
         moveTaskInBoard(
           projectId,
           task.id,
           newStatusOptionId,
           currentStatusOptionId,
-          0
+          originalIndex
         );
       }
     },

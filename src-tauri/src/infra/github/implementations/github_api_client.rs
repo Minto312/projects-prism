@@ -9,6 +9,7 @@ use crate::infra::github::api::queries;
 use crate::infra::github::mapper::response_mapper;
 
 const GITHUB_GRAPHQL_URL: &str = "https://api.github.com/graphql";
+const MAX_PAGINATION_PAGES: usize = 100;
 
 pub struct GitHubApiClient {
     client: Client,
@@ -51,7 +52,21 @@ impl GitHubApiClient {
         }
 
         if status.as_u16() == 403 {
-            // Rate limit の可能性をチェック
+            // ヘッダからレートリミットリセット時刻を取得（bodyの前に読む）
+            let rate_limit_reset = response
+                .headers()
+                .get("x-ratelimit-reset")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.parse::<i64>().ok())
+                .map(|epoch_secs| epoch_secs * 1000); // ミリ秒に変換
+
+            let retry_after = response
+                .headers()
+                .get("retry-after")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.parse::<i64>().ok())
+                .map(|secs| chrono::Utc::now().timestamp_millis() + secs * 1000);
+
             let body: Value = response
                 .json()
                 .await
@@ -59,8 +74,9 @@ impl GitHubApiClient {
 
             if let Some(msg) = body["message"].as_str() {
                 if msg.contains("rate limit") || msg.contains("API rate limit") {
-                    // Reset time を取得
-                    let reset_at = chrono::Utc::now().timestamp_millis() + 60 * 60 * 1000; // 1時間後
+                    let reset_at = rate_limit_reset
+                        .or(retry_after)
+                        .unwrap_or_else(|| chrono::Utc::now().timestamp_millis() + 60 * 60 * 1000);
                     return Err(DomainError::RateLimited { reset_at });
                 }
             }
@@ -114,7 +130,7 @@ impl GitHubPort for GitHubApiClient {
         let mut all_projects = Vec::new();
         let mut after: Option<String> = None;
 
-        loop {
+        for _ in 0..MAX_PAGINATION_PAGES {
             let variables = json!({
                 "after": after,
             });
@@ -145,7 +161,7 @@ impl GitHubPort for GitHubApiClient {
         let mut after: Option<String> = None;
         let mut result_data: Option<GitHubProjectData> = None;
 
-        loop {
+        for _ in 0..MAX_PAGINATION_PAGES {
             let variables = json!({
                 "projectId": project_id,
                 "after": after,

@@ -6,6 +6,7 @@ use crate::AppState;
 
 #[tauri::command]
 pub async fn sync_now(state: State<'_, AppState>) -> Result<SyncResult, String> {
+    let _guard = state.sync_lock.lock().await;
     SyncToGitHubUseCase::execute(state.github.as_ref(), state.persistence.as_ref())
         .await
         .map_err(|e| e.to_string())

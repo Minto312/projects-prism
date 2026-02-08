@@ -33,6 +33,31 @@ impl SqlitePersistence {
 
 impl PersistencePort for SqlitePersistence {
     // ========================================
+    // Transaction
+    // ========================================
+
+    fn begin_transaction(&self) -> Result<(), DomainError> {
+        let conn = self.conn.lock().map_err(|e| DomainError::Persistence(e.to_string()))?;
+        conn.execute_batch("BEGIN TRANSACTION")
+            .map_err(|e| DomainError::Persistence(e.to_string()))?;
+        Ok(())
+    }
+
+    fn commit_transaction(&self) -> Result<(), DomainError> {
+        let conn = self.conn.lock().map_err(|e| DomainError::Persistence(e.to_string()))?;
+        conn.execute_batch("COMMIT")
+            .map_err(|e| DomainError::Persistence(e.to_string()))?;
+        Ok(())
+    }
+
+    fn rollback_transaction(&self) -> Result<(), DomainError> {
+        let conn = self.conn.lock().map_err(|e| DomainError::Persistence(e.to_string()))?;
+        conn.execute_batch("ROLLBACK")
+            .map_err(|e| DomainError::Persistence(e.to_string()))?;
+        Ok(())
+    }
+
+    // ========================================
     // Settings
     // ========================================
 
@@ -508,7 +533,9 @@ impl PersistencePort for SqlitePersistence {
         let conn = self.conn.lock().map_err(|e| DomainError::Persistence(e.to_string()))?;
         let id = uuid::Uuid::new_v4().to_string();
         let now = chrono::Utc::now().timestamp_millis();
-        let op_type_str = "MoveItemToColumn";
+        let op_type_str = match input.op_type {
+            OperationType::MoveItemToColumn => "MoveItemToColumn",
+        };
         let status_str = "pending";
 
         conn.execute(
@@ -600,10 +627,17 @@ impl PersistencePort for SqlitePersistence {
 // Internal helpers
 // ============================================================
 
+fn parse_operation_type(s: &str) -> OperationType {
+    match s {
+        "MoveItemToColumn" => OperationType::MoveItemToColumn,
+        _ => OperationType::MoveItemToColumn,
+    }
+}
+
 fn row_to_operation(row: &rusqlite::Row<'_>) -> rusqlite::Result<Operation> {
     Ok(Operation {
         id: row.get(0)?,
-        op_type: OperationType::MoveItemToColumn,
+        op_type: parse_operation_type(&row.get::<_, String>(1)?),
         payload: OperationPayload {
             item_id: row.get(2)?,
             project_id: row.get(3)?,

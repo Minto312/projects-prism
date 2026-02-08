@@ -4,7 +4,7 @@
  * 同期処理の管理
  */
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../../infra/query/keys';
 import { getSyncAdapter } from '../../infra/sync/syncAdapter';
@@ -144,14 +144,18 @@ export function useSyncOperations(): UseSyncOperationsResult {
 export function useAutoSync(enabled: boolean = false, intervalMs: number = 300000) {
   const { syncNow, syncState, pendingCount } = useSyncOperations();
 
+  const syncNowRef = useRef(syncNow);
+  syncNowRef.current = syncNow;
+
+  const canSync = enabled && pendingCount > 0 && (!syncState || shouldSync(syncState));
+
   useEffect(() => {
-    if (!enabled || pendingCount === 0) return;
-    if (syncState && !shouldSync(syncState)) return;
+    if (!canSync) return;
 
     const timer = setInterval(() => {
-      syncNow();
+      syncNowRef.current();
     }, intervalMs);
 
     return () => clearInterval(timer);
-  }, [enabled, intervalMs, syncNow, syncState, pendingCount]);
+  }, [canSync, intervalMs]);
 }

@@ -173,7 +173,7 @@ query($projectId: ID!, $after: String) {
 
 /// 単一アイテムの Status 取得
 pub const ITEM_STATUS_QUERY: &str = r#"
-query($itemId: ID!, $projectId: ID!) {
+query($itemId: ID!) {
   node(id: $itemId) {
     ... on ProjectV2Item {
       id

@@ -6,6 +6,13 @@ use crate::domain::errors::DomainError;
 
 pub trait PersistencePort: Send + Sync {
     // ========================================
+    // Transaction
+    // ========================================
+    fn begin_transaction(&self) -> Result<(), DomainError>;
+    fn commit_transaction(&self) -> Result<(), DomainError>;
+    fn rollback_transaction(&self) -> Result<(), DomainError>;
+
+    // ========================================
     // Settings
     // ========================================
     fn get_setting(&self, key: &str) -> Result<Option<String>, DomainError>;

@@ -17,7 +17,12 @@ import { useConflictStore, createConflictDetail } from './conflictStore';
 export class SyncAdapter implements SyncPort {
   async appendOperation(input: AppendOperationInput): Promise<Operation> {
     // Rust側に操作を追加
-    const [operation] = await syncApi.appendOps([input]);
+    const operations = await syncApi.appendOps([input]);
+
+    if (!operations || operations.length === 0) {
+      throw new Error('appendOps returned empty result');
+    }
+    const operation = operations[0];
 
     // メモリキャッシュにも追加
     useOpQueueStore.getState().addOperation(operation);

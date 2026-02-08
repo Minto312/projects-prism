@@ -69,65 +69,84 @@ impl FetchBootstrapUseCase {
 
         // ユーザー検証
         let current_user_login = github.validate_token(&pat).await?;
-        persistence.set_setting("current_user_login", &current_user_login)?;
 
-        // プロジェクト一覧取得
+        // GitHub から全データを先に取得（DB書き込みなし）
         let projects = github.fetch_projects(&pat).await?;
         let project_ids: Vec<String> = projects.iter().map(|p| p.id.clone()).collect();
 
-        // キャッシュ更新
-        for project in &projects {
-            persistence.upsert_project(project)?;
-        }
-        persistence.delete_projects_not_in(&project_ids)?;
-
-        // 各プロジェクトのアイテム取得
-        let mut all_status_fields = Vec::new();
-        let mut all_status_options = Vec::new();
-        let mut all_tasks = Vec::new();
-
+        let mut all_project_data = Vec::new();
         for project in &projects {
             let project_data = github.fetch_project_items(&pat, &project.id).await?;
-
-            // Status field を更新
-            persistence.delete_status_fields_by_project(&project.id)?;
-            if let Some(ref field) = project_data.status_field {
-                persistence.upsert_status_field(field)?;
-                persistence.delete_status_options_by_field(&field.id)?;
-                for option in &project_data.status_options {
-                    persistence.upsert_status_option(option)?;
-                }
-                all_status_fields.push(field.clone());
-                all_status_options.extend(project_data.status_options.clone());
-            }
-
-            // Tasks を更新
-            persistence.delete_tasks_by_project(&project.id)?;
-            for task in &project_data.tasks {
-                persistence.upsert_task(task)?;
-            }
-            all_tasks.extend(project_data.tasks);
+            all_project_data.push(project_data);
         }
 
-        let pending_operations =
-            persistence.get_operations_by_status(&OperationStatus::Pending)?;
-        let conflict_operations =
-            persistence.get_operations_by_status(&OperationStatus::Conflict)?;
+        // トランザクション内でキャッシュを一括更新
+        persistence.begin_transaction()?;
+        let result = (|| -> Result<_, DomainError> {
+            persistence.set_setting("current_user_login", &current_user_login)?;
 
-        let conflicts = conflict_operations
-            .into_iter()
-            .map(|op| build_conflict_info(persistence, op))
-            .collect();
+            for project in &projects {
+                persistence.upsert_project(project)?;
+            }
+            persistence.delete_projects_not_in(&project_ids)?;
 
-        Ok(BootstrapResponse {
-            projects,
-            status_fields: all_status_fields,
-            status_options: all_status_options,
-            tasks: all_tasks,
-            pending_operations,
-            conflicts,
-            current_user_login,
-        })
+            let mut all_status_fields = Vec::new();
+            let mut all_status_options = Vec::new();
+            let mut all_tasks = Vec::new();
+
+            for project_data in all_project_data {
+                let pid = &project_data.project.id;
+
+                persistence.delete_status_fields_by_project(pid)?;
+                if let Some(ref field) = project_data.status_field {
+                    persistence.upsert_status_field(field)?;
+                    persistence.delete_status_options_by_field(&field.id)?;
+                    for option in &project_data.status_options {
+                        persistence.upsert_status_option(option)?;
+                    }
+                    all_status_fields.push(field.clone());
+                    all_status_options.extend(project_data.status_options.clone());
+                }
+
+                persistence.delete_tasks_by_project(pid)?;
+                for task in &project_data.tasks {
+                    persistence.upsert_task(task)?;
+                }
+                all_tasks.extend(project_data.tasks);
+            }
+
+            Ok((all_status_fields, all_status_options, all_tasks))
+        })();
+
+        match result {
+            Ok((all_status_fields, all_status_options, all_tasks)) => {
+                persistence.commit_transaction()?;
+
+                let pending_operations =
+                    persistence.get_operations_by_status(&OperationStatus::Pending)?;
+                let conflict_operations =
+                    persistence.get_operations_by_status(&OperationStatus::Conflict)?;
+
+                let conflicts = conflict_operations
+                    .into_iter()
+                    .map(|op| build_conflict_info(persistence, op))
+                    .collect();
+
+                Ok(BootstrapResponse {
+                    projects,
+                    status_fields: all_status_fields,
+                    status_options: all_status_options,
+                    tasks: all_tasks,
+                    pending_operations,
+                    conflicts,
+                    current_user_login,
+                })
+            }
+            Err(e) => {
+                let _ = persistence.rollback_transaction();
+                Err(e)
+            }
+        }
     }
 
     /// 特定プロジェクトのブートストラップデータをキャッシュから取得
@@ -187,25 +206,39 @@ impl FetchBootstrapUseCase {
             .get_setting("github_pat")?
             .ok_or_else(|| DomainError::Authentication("PAT is not configured".to_string()))?;
 
+        // GitHub からデータを先に取得
         let project_data = github.fetch_project_items(&pat, project_id).await?;
 
-        // プロジェクト自体を更新
-        persistence.upsert_project(&project_data.project)?;
+        // トランザクション内でキャッシュを一括更新
+        persistence.begin_transaction()?;
+        let result = (|| -> Result<(), DomainError> {
+            persistence.upsert_project(&project_data.project)?;
 
-        // Status field を更新
-        persistence.delete_status_fields_by_project(project_id)?;
-        if let Some(ref field) = project_data.status_field {
-            persistence.upsert_status_field(field)?;
-            persistence.delete_status_options_by_field(&field.id)?;
-            for option in &project_data.status_options {
-                persistence.upsert_status_option(option)?;
+            persistence.delete_status_fields_by_project(project_id)?;
+            if let Some(ref field) = project_data.status_field {
+                persistence.upsert_status_field(field)?;
+                persistence.delete_status_options_by_field(&field.id)?;
+                for option in &project_data.status_options {
+                    persistence.upsert_status_option(option)?;
+                }
             }
-        }
 
-        // Tasks を更新
-        persistence.delete_tasks_by_project(project_id)?;
-        for task in &project_data.tasks {
-            persistence.upsert_task(task)?;
+            persistence.delete_tasks_by_project(project_id)?;
+            for task in &project_data.tasks {
+                persistence.upsert_task(task)?;
+            }
+
+            Ok(())
+        })();
+
+        match result {
+            Ok(()) => {
+                persistence.commit_transaction()?;
+            }
+            Err(e) => {
+                let _ = persistence.rollback_transaction();
+                return Err(e);
+            }
         }
 
         let statuses = [OperationStatus::Pending, OperationStatus::Conflict];

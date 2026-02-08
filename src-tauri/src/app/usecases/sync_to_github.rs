@@ -153,6 +153,13 @@ impl SyncToGitHubUseCase {
             }
         }
 
+        if !failed.is_empty() {
+            let last_error = failed.last().map(|f| f.error.clone()).unwrap_or_default();
+            persistence.set_setting("last_sync_error", &last_error)?;
+        } else {
+            persistence.delete_setting("last_sync_error").ok();
+        }
+
         if !completed.is_empty() {
             let now = chrono::Utc::now().timestamp_millis();
             persistence.set_setting("last_sync_success_at", &now.to_string())?;
@@ -198,11 +205,7 @@ impl SyncToGitHubUseCase {
             } else {
                 // レート制限解除済み
                 persistence.delete_setting("rate_limit_reset_at").ok();
-                if pending_count > 0 {
-                    SyncStatus::Idle
-                } else {
-                    SyncStatus::Idle
-                }
+                SyncStatus::Idle
             }
         } else if last_error.is_some() {
             SyncStatus::Error

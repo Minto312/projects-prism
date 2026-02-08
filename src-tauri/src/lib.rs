@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use tauri::Manager;
+use tokio::sync::Mutex as TokioMutex;
 
 use infra::github::implementations::github_api_client::GitHubApiClient;
 use infra::persistence::sqlite::implementations::sqlite_persistence::SqlitePersistence;
@@ -13,6 +14,7 @@ pub mod interface;
 pub struct AppState {
     pub persistence: Arc<SqlitePersistence>,
     pub github: Arc<GitHubApiClient>,
+    pub sync_lock: TokioMutex<()>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -35,6 +37,7 @@ pub fn run() {
             let state = AppState {
                 persistence: Arc::new(persistence),
                 github: Arc::new(github),
+                sync_lock: TokioMutex::new(()),
             };
 
             app.manage(state);
