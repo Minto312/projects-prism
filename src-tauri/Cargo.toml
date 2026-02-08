@@ -1,8 +1,8 @@
 [package]
 name = "prism"
 version = "0.1.0"
-description = "A cross-organizational GitHub Projects manager"
-authors = []
+description = "Cross-organization GitHub Projects V2 manager"
+authors = ["karinto"]
 edition = "2021"
 
 [lib]
@@ -16,6 +16,17 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+rusqlite = { version = "0.32", features = ["bundled"] }
+reqwest = { version = "0.12", features = ["json"] }
+async-trait = "0.1"
+thiserror = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+tokio = { version = "1", features = ["full"] }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
 
 [lints.clippy]
 all = { level = "warn", priority = -1 }
