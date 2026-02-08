@@ -1,15 +1,9 @@
-pub const SCHEMA: &str = r#"
--- ========================================
--- 設定
--- ========================================
+pub const CREATE_TABLES: &str = r#"
 CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
 
--- ========================================
--- プロジェクト（キャッシュ）
--- ========================================
 CREATE TABLE IF NOT EXISTS projects (
     id          TEXT PRIMARY KEY,
     owner_type  TEXT NOT NULL CHECK(owner_type IN ('organization', 'user')),
@@ -20,9 +14,6 @@ CREATE TABLE IF NOT EXISTS projects (
     synced_at   INTEGER
 );
 
--- ========================================
--- ステータスフィールド定義（キャッシュ）
--- ========================================
 CREATE TABLE IF NOT EXISTS status_fields (
     id          TEXT PRIMARY KEY,
     project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -30,9 +21,6 @@ CREATE TABLE IF NOT EXISTS status_fields (
     UNIQUE(project_id)
 );
 
--- ========================================
--- ステータス選択肢（キャッシュ）
--- ========================================
 CREATE TABLE IF NOT EXISTS status_options (
     id              TEXT PRIMARY KEY,
     status_field_id TEXT NOT NULL REFERENCES status_fields(id) ON DELETE CASCADE,
@@ -42,9 +30,6 @@ CREATE TABLE IF NOT EXISTS status_options (
     UNIQUE(status_field_id, position)
 );
 
--- ========================================
--- タスク（ProjectV2 Item）（キャッシュ）
--- ========================================
 CREATE TABLE IF NOT EXISTS tasks (
     id                TEXT PRIMARY KEY,
     project_id        TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -52,7 +37,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     content_id        TEXT,
     title             TEXT NOT NULL,
     body              TEXT,
-    status_option_id  TEXT REFERENCES status_options(id) ON DELETE SET NULL,
+    status_option_id  TEXT,
     assignee_login    TEXT,
     due_date          TEXT,
     url               TEXT,
@@ -60,9 +45,6 @@ CREATE TABLE IF NOT EXISTS tasks (
     synced_at         INTEGER
 );
 
--- ========================================
--- Operation Log（pending ops）
--- ========================================
 CREATE TABLE IF NOT EXISTS operations (
     id                      TEXT PRIMARY KEY,
     op_type                 TEXT NOT NULL CHECK(op_type IN ('MoveItemToColumn')),
@@ -79,9 +61,6 @@ CREATE TABLE IF NOT EXISTS operations (
     resolved_at             INTEGER
 );
 
--- ========================================
--- インデックス
--- ========================================
 CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks(project_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_assignee ON tasks(assignee_login);
 CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);

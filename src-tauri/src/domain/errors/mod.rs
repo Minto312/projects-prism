@@ -1,21 +1,26 @@
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Debug, Error)]
 pub enum DomainError {
     #[error("Authentication error: {0}")]
-    AuthenticationError(String),
+    Authentication(String),
 
     #[error("GitHub API error: {0}")]
-    GitHubApiError(String),
+    Api(String),
 
-    #[error("Rate limit exceeded: {0}")]
-    RateLimitExceeded(String),
+    #[error("Rate limited until {reset_at}")]
+    RateLimited { reset_at: i64 },
 
     #[error("Persistence error: {0}")]
-    PersistenceError(String),
+    Persistence(String),
 
-    #[error("Conflict detected: {0}")]
-    ConflictDetected(String),
+    #[error("Conflict detected for operation {operation_id}: current={current_option_id}, expected={expected_option_id}")]
+    Conflict {
+        operation_id: String,
+        current_option_id: String,
+        current_option_name: String,
+        expected_option_id: String,
+    },
 
     #[error("Not found: {0}")]
     NotFound(String),
@@ -24,22 +29,7 @@ pub enum DomainError {
     InvalidInput(String),
 
     #[error("Network error: {0}")]
-    NetworkError(String),
-}
-
-impl DomainError {
-    fn variant_name(&self) -> &'static str {
-        match self {
-            DomainError::AuthenticationError(_) => "AuthenticationError",
-            DomainError::GitHubApiError(_) => "GitHubApiError",
-            DomainError::RateLimitExceeded(_) => "RateLimitExceeded",
-            DomainError::PersistenceError(_) => "PersistenceError",
-            DomainError::ConflictDetected(_) => "ConflictDetected",
-            DomainError::NotFound(_) => "NotFound",
-            DomainError::InvalidInput(_) => "InvalidInput",
-            DomainError::NetworkError(_) => "NetworkError",
-        }
-    }
+    Network(String),
 }
 
 impl serde::Serialize for DomainError {
@@ -47,10 +37,6 @@ impl serde::Serialize for DomainError {
     where
         S: serde::Serializer,
     {
-        use serde::ser::SerializeStruct;
-        let mut state = serializer.serialize_struct("DomainError", 2)?;
-        state.serialize_field("type", self.variant_name())?;
-        state.serialize_field("message", &self.to_string())?;
-        state.end()
+        serializer.serialize_str(&self.to_string())
     }
 }
