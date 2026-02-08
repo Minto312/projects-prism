@@ -134,28 +134,3 @@ impl From<&str> for OperationId {
     }
 }
 
-/// Issue/PR node ID
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct ContentId(pub String);
-
-impl ContentId {
-    pub fn new(id: impl Into<String>) -> Self {
-        Self(id.into())
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl From<String> for ContentId {
-    fn from(s: String) -> Self {
-        Self(s)
-    }
-}
-
-impl From<&str> for ContentId {
-    fn from(s: &str) -> Self {
-        Self(s.to_string())
-    }
-}

@@ -1,4 +1,4 @@
-use crate::app::dtos::{BootstrapResponse, ConflictInfo, SyncState};
+use crate::app::dtos::{BootstrapResponse, ConflictInfo, ProjectDto, SyncState, TaskDto};
 use crate::app::ports::{GitHubPort, PersistencePort};
 use crate::domain::DomainError;
 
@@ -69,13 +69,7 @@ impl<'a, P: PersistencePort, G: GitHubPort> FetchBootstrapUseCase<'a, P, G> {
 
     async fn load_from_cache(
         &self,
-    ) -> Result<
-        (
-            Vec<crate::app::dtos::ProjectDto>,
-            Vec<crate::app::dtos::TaskDto>,
-        ),
-        DomainError,
-    > {
+    ) -> Result<(Vec<ProjectDto>, Vec<TaskDto>), DomainError> {
         let projects = self.persistence.get_all_projects().await?;
         let tasks = self.persistence.get_all_tasks().await?;
         Ok((projects, tasks))
@@ -84,13 +78,7 @@ impl<'a, P: PersistencePort, G: GitHubPort> FetchBootstrapUseCase<'a, P, G> {
     async fn refresh_from_github(
         &self,
         token: &str,
-    ) -> Result<
-        (
-            Vec<crate::app::dtos::ProjectDto>,
-            Vec<crate::app::dtos::TaskDto>,
-        ),
-        DomainError,
-    > {
+    ) -> Result<(Vec<ProjectDto>, Vec<TaskDto>), DomainError> {
         let now = chrono::Utc::now().timestamp_millis();
 
         let projects = self.github.fetch_accessible_projects(token).await?;
@@ -115,8 +103,14 @@ impl<'a, P: PersistencePort, G: GitHubPort> FetchBootstrapUseCase<'a, P, G> {
             let mut tasks = self.github.fetch_project_items(token, &project.id).await?;
             for task in &mut tasks {
                 task.synced_at = Some(now);
-                self.persistence.upsert_task(task).await?;
             }
+
+            self.persistence.upsert_tasks_batch(&tasks).await?;
+
+            let active_ids: Vec<_> = tasks.iter().map(|t| t.id.clone()).collect();
+            self.persistence
+                .delete_stale_tasks_by_project(&project.id, &active_ids)
+                .await?;
 
             all_tasks.extend(tasks);
             updated_projects.push(project);

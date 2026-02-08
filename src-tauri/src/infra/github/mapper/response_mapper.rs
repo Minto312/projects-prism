@@ -283,8 +283,11 @@ fn extract_field_values(node: &Value) -> (Option<StatusOptionId>, Option<String>
             }
             Some("ProjectV2ItemFieldDateValue") => {
                 let field_name = fv["field"]["name"].as_str().unwrap_or("");
-                if field_name.to_lowercase().contains("due") || field_name.to_lowercase() == "date"
-                {
+                let name_lower = field_name.to_lowercase();
+                if matches!(
+                    name_lower.as_str(),
+                    "due" | "due date" | "due_date" | "deadline"
+                ) {
                     if let Some(date) = fv["date"].as_str() {
                         due_date = Some(date.to_string());
                     }

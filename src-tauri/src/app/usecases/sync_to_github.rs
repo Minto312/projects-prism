@@ -15,6 +15,15 @@ impl<'a, P: PersistencePort, G: GitHubPort> SyncToGitHubUseCase<'a, P, G> {
         }
     }
 
+    fn is_abort_error(e: &DomainError) -> bool {
+        matches!(
+            e,
+            DomainError::AuthenticationError(_)
+                | DomainError::RateLimitExceeded(_)
+                | DomainError::NetworkError(_)
+        )
+    }
+
     pub async fn execute(&self) -> Result<SyncResult, DomainError> {
         let token = self
             .persistence
@@ -46,16 +55,34 @@ impl<'a, P: PersistencePort, G: GitHubPort> SyncToGitHubUseCase<'a, P, G> {
             let current_status = match current_status {
                 Ok(status) => status,
                 Err(e) => {
+                    let should_abort = Self::is_abort_error(&e);
                     let now = chrono::Utc::now().timestamp_millis();
-                    self.persistence
-                        .update_operation_status(
-                            &operation.id,
-                            OperationStatus::Failed,
-                            Some(&e.to_string()),
-                            Some(now),
-                        )
-                        .await?;
-                    failed_count += 1;
+
+                    if should_abort {
+                        // Transient/auth error: revert to pending for retry
+                        self.persistence
+                            .update_operation_status(
+                                &operation.id,
+                                OperationStatus::Pending,
+                                None,
+                                None,
+                            )
+                            .await?;
+                    } else {
+                        self.persistence
+                            .update_operation_status(
+                                &operation.id,
+                                OperationStatus::Failed,
+                                Some(&e.to_string()),
+                                Some(now),
+                            )
+                            .await?;
+                        failed_count += 1;
+                    }
+
+                    if should_abort {
+                        break;
+                    }
                     continue;
                 }
             };
@@ -118,6 +145,20 @@ impl<'a, P: PersistencePort, G: GitHubPort> SyncToGitHubUseCase<'a, P, G> {
                     completed_count += 1;
                 }
                 Err(e) => {
+                    let should_abort = Self::is_abort_error(&e);
+
+                    if should_abort {
+                        self.persistence
+                            .update_operation_status(
+                                &operation.id,
+                                OperationStatus::Pending,
+                                None,
+                                None,
+                            )
+                            .await?;
+                        break;
+                    }
+
                     self.persistence
                         .update_operation_status(
                             &operation.id,

@@ -3,6 +3,8 @@ use rusqlite::{params, Connection, OptionalExtension};
 use std::path::Path;
 use std::sync::Mutex;
 
+use std::collections::HashMap;
+
 use crate::app::dtos::{
     ContentType, Operation, OperationPayload, OperationStatus, OperationType, OwnerType,
     Precondition, ProjectDto, StatusFieldDto, StatusOptionDto, TaskDto,
@@ -20,7 +22,7 @@ impl SqlitePersistence {
         let conn = Connection::open(db_path)
             .map_err(|e| DomainError::PersistenceError(e.to_string()))?;
 
-        conn.execute_batch("PRAGMA foreign_keys = ON;")
+        conn.execute_batch("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;")
             .map_err(|e| DomainError::PersistenceError(e.to_string()))?;
 
         conn.execute_batch(SCHEMA)
@@ -32,8 +34,9 @@ impl SqlitePersistence {
     }
 
     fn conn(&self) -> std::sync::MutexGuard<'_, Connection> {
-        // Note: MutexGuard must NOT be held across .await points.
-        // All DB operations within each trait method are synchronous.
+        // Recover from poison: if a previous operation panicked while holding the lock,
+        // the connection is still usable since SQLite auto-rollbacks incomplete transactions.
+        // MutexGuard must NOT be held across .await points.
         self.conn.lock().unwrap_or_else(|e| e.into_inner())
     }
 
@@ -150,7 +153,11 @@ impl SqlitePersistence {
         conn: &Connection,
         field: &StatusFieldDto,
     ) -> Result<(), DomainError> {
-        conn.execute(
+        let tx = conn
+            .unchecked_transaction()
+            .map_err(|e| DomainError::PersistenceError(e.to_string()))?;
+
+        tx.execute(
             r#"
             INSERT INTO status_fields (id, project_id, name)
             VALUES (?1, ?2, ?3)
@@ -162,12 +169,36 @@ impl SqlitePersistence {
         )
         .map_err(|e| DomainError::PersistenceError(e.to_string()))?;
 
-        Self::delete_status_options_by_field_with(conn, &field.id)?;
+        tx.execute(
+            "DELETE FROM status_options WHERE status_field_id = ?1",
+            params![field.id.as_str()],
+        )
+        .map_err(|e| DomainError::PersistenceError(e.to_string()))?;
 
         for option in &field.options {
-            Self::upsert_status_option_with(conn, option)?;
+            tx.execute(
+                r#"
+                INSERT INTO status_options (id, status_field_id, name, color, position)
+                VALUES (?1, ?2, ?3, ?4, ?5)
+                ON CONFLICT(id) DO UPDATE SET
+                    status_field_id = excluded.status_field_id,
+                    name = excluded.name,
+                    color = excluded.color,
+                    position = excluded.position
+                "#,
+                params![
+                    option.id.as_str(),
+                    option.status_field_id.as_str(),
+                    option.name,
+                    option.color,
+                    option.position,
+                ],
+            )
+            .map_err(|e| DomainError::PersistenceError(e.to_string()))?;
         }
 
+        tx.commit()
+            .map_err(|e| DomainError::PersistenceError(e.to_string()))?;
         Ok(())
     }
 
@@ -312,6 +343,8 @@ impl PersistencePort for SqlitePersistence {
 
     async fn get_all_projects(&self) -> Result<Vec<ProjectDto>, DomainError> {
         let conn = self.conn();
+
+        // 1. Fetch all projects
         let mut stmt = conn
             .prepare(
                 "SELECT id, owner_type, owner_login, title, url, updated_at, synced_at FROM projects",
@@ -343,12 +376,79 @@ impl PersistencePort for SqlitePersistence {
 
         let mut projects = Vec::new();
         for row in rows {
-            let mut project = row.map_err(|e| DomainError::PersistenceError(e.to_string()))?;
-            if let Ok(Some(field)) = Self::get_status_field_with(&conn, &project.id) {
-                project.status_field = Some(field);
-            }
-            projects.push(project);
+            projects.push(row.map_err(|e| DomainError::PersistenceError(e.to_string()))?);
         }
+
+        // 2. Batch-fetch all status fields
+        let mut field_stmt = conn
+            .prepare("SELECT id, project_id, name FROM status_fields")
+            .map_err(|e| DomainError::PersistenceError(e.to_string()))?;
+
+        let mut fields_by_project: HashMap<String, (StatusFieldId, String)> = HashMap::new();
+        let field_rows = field_stmt
+            .query_map([], |row| {
+                let id: String = row.get(0)?;
+                let project_id: String = row.get(1)?;
+                let name: String = row.get(2)?;
+                Ok((id, project_id, name))
+            })
+            .map_err(|e| DomainError::PersistenceError(e.to_string()))?;
+
+        for row in field_rows {
+            let (id, project_id, name) =
+                row.map_err(|e| DomainError::PersistenceError(e.to_string()))?;
+            fields_by_project.insert(project_id, (StatusFieldId::new(&id), name));
+        }
+
+        // 3. Batch-fetch all status options
+        let mut opt_stmt = conn
+            .prepare(
+                "SELECT id, status_field_id, name, color, position FROM status_options ORDER BY position",
+            )
+            .map_err(|e| DomainError::PersistenceError(e.to_string()))?;
+
+        let mut options_by_field: HashMap<String, Vec<StatusOptionDto>> = HashMap::new();
+        let opt_rows = opt_stmt
+            .query_map([], |row| {
+                let id: String = row.get(0)?;
+                let field_id: String = row.get(1)?;
+                let name: String = row.get(2)?;
+                let color: Option<String> = row.get(3)?;
+                let position: i32 = row.get(4)?;
+                Ok((id, field_id, name, color, position))
+            })
+            .map_err(|e| DomainError::PersistenceError(e.to_string()))?;
+
+        for row in opt_rows {
+            let (id, field_id, name, color, position) =
+                row.map_err(|e| DomainError::PersistenceError(e.to_string()))?;
+            options_by_field
+                .entry(field_id.clone())
+                .or_default()
+                .push(StatusOptionDto {
+                    id: StatusOptionId::new(id),
+                    status_field_id: StatusFieldId::new(field_id),
+                    name,
+                    color,
+                    position,
+                });
+        }
+
+        // 4. Assemble projects with status fields and options
+        for project in &mut projects {
+            if let Some((field_id, name)) = fields_by_project.remove(project.id.as_str()) {
+                let options = options_by_field
+                    .remove(field_id.as_str())
+                    .unwrap_or_default();
+                project.status_field = Some(StatusFieldDto {
+                    id: field_id,
+                    project_id: project.id.clone(),
+                    name,
+                    options,
+                });
+            }
+        }
+
         Ok(projects)
     }
 
@@ -606,6 +706,92 @@ impl PersistencePort for SqlitePersistence {
         conn.execute(
             "DELETE FROM tasks WHERE project_id = ?1",
             params![project_id.as_str()],
+        )
+        .map_err(|e| DomainError::PersistenceError(e.to_string()))?;
+        Ok(())
+    }
+
+    async fn upsert_tasks_batch(&self, tasks: &[TaskDto]) -> Result<(), DomainError> {
+        let conn = self.conn();
+        let tx = conn
+            .unchecked_transaction()
+            .map_err(|e| DomainError::PersistenceError(e.to_string()))?;
+
+        {
+            let mut stmt = tx
+                .prepare(
+                    r#"
+                    INSERT INTO tasks
+                        (id, project_id, content_type, content_id, title, body,
+                         status_option_id, assignee_login, due_date, url, updated_at, synced_at)
+                    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+                    ON CONFLICT(id) DO UPDATE SET
+                        project_id = excluded.project_id,
+                        content_type = excluded.content_type,
+                        content_id = excluded.content_id,
+                        title = excluded.title,
+                        body = excluded.body,
+                        status_option_id = excluded.status_option_id,
+                        assignee_login = excluded.assignee_login,
+                        due_date = excluded.due_date,
+                        url = excluded.url,
+                        updated_at = excluded.updated_at,
+                        synced_at = excluded.synced_at
+                    "#,
+                )
+                .map_err(|e| DomainError::PersistenceError(e.to_string()))?;
+
+            for task in tasks {
+                stmt.execute(params![
+                    task.id.as_str(),
+                    task.project_id.as_str(),
+                    task.content_type.as_str(),
+                    task.content_id,
+                    task.title,
+                    task.body,
+                    task.status_option_id.as_ref().map(|id| id.as_str()),
+                    task.assignee_login,
+                    task.due_date,
+                    task.url,
+                    task.updated_at,
+                    task.synced_at,
+                ])
+                .map_err(|e| DomainError::PersistenceError(e.to_string()))?;
+            }
+        }
+
+        tx.commit()
+            .map_err(|e| DomainError::PersistenceError(e.to_string()))?;
+        Ok(())
+    }
+
+    async fn delete_stale_tasks_by_project(
+        &self,
+        project_id: &ProjectId,
+        active_task_ids: &[TaskId],
+    ) -> Result<(), DomainError> {
+        if active_task_ids.is_empty() {
+            return self.delete_tasks_by_project(project_id).await;
+        }
+
+        let conn = self.conn();
+        let placeholders: Vec<String> = (0..active_task_ids.len())
+            .map(|i| format!("?{}", i + 2))
+            .collect();
+        let sql = format!(
+            "DELETE FROM tasks WHERE project_id = ?1 AND id NOT IN ({})",
+            placeholders.join(", ")
+        );
+
+        let mut params_vec: Vec<Box<dyn rusqlite::types::ToSql>> =
+            vec![Box::new(project_id.as_str().to_string())];
+        for id in active_task_ids {
+            params_vec.push(Box::new(id.as_str().to_string()));
+        }
+
+        conn.execute(
+            &sql,
+            rusqlite::params_from_iter(params_vec.iter().map(|p| p.as_ref())),
         )
         .map_err(|e| DomainError::PersistenceError(e.to_string()))?;
         Ok(())

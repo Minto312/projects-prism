@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     content_id        TEXT,
     title             TEXT NOT NULL,
     body              TEXT,
-    status_option_id  TEXT REFERENCES status_options(id),
+    status_option_id  TEXT REFERENCES status_options(id) ON DELETE SET NULL,
     assignee_login    TEXT,
     due_date          TEXT,
     url               TEXT,

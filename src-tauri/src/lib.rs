@@ -5,14 +5,17 @@ pub mod interface;
 
 use infra::persistence::sqlite::SqlitePersistence;
 use infra::github::implementations::GitHubApiClient;
+use crate::app::dtos::RateLimitInfo;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::time::Instant;
 use tauri::Manager;
 
 pub struct AppState {
     pub persistence: Arc<SqlitePersistence>,
     pub github_client: Arc<GitHubApiClient>,
     pub is_syncing: AtomicBool,
+    pub rate_limit_cache: std::sync::Mutex<Option<(RateLimitInfo, Instant)>>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -25,12 +28,13 @@ pub fn run() {
             let db_path = app_data_dir.join("prism.db");
             let persistence = SqlitePersistence::new(&db_path).expect("Failed to initialize database");
 
-            let github_client = GitHubApiClient::new();
+            let github_client = GitHubApiClient::new().expect("Failed to create GitHub API client");
 
             let state = AppState {
                 persistence: Arc::new(persistence),
                 github_client: Arc::new(github_client),
                 is_syncing: AtomicBool::new(false),
+                rate_limit_cache: std::sync::Mutex::new(None),
             };
 
             app.manage(state);

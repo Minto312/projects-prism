@@ -13,13 +13,13 @@ pub struct GitHubApiClient {
 }
 
 impl GitHubApiClient {
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self, DomainError> {
         let client = Client::builder()
             .user_agent("Prism/0.1.0")
             .build()
-            .expect("Failed to create HTTP client");
+            .map_err(|e| DomainError::NetworkError(format!("Failed to create HTTP client: {}", e)))?;
 
-        Self { client }
+        Ok(Self { client })
     }
 
     async fn execute_graphql(
@@ -89,7 +89,7 @@ impl GitHubApiClient {
 
 impl Default for GitHubApiClient {
     fn default() -> Self {
-        Self::new()
+        Self::new().expect("Failed to create default HTTP client")
     }
 }
 

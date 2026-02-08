@@ -66,6 +66,14 @@ pub trait PersistencePort: Send + Sync {
 
     async fn delete_tasks_by_project(&self, project_id: &ProjectId) -> Result<(), DomainError>;
 
+    async fn upsert_tasks_batch(&self, tasks: &[TaskDto]) -> Result<(), DomainError>;
+
+    async fn delete_stale_tasks_by_project(
+        &self,
+        project_id: &ProjectId,
+        active_task_ids: &[TaskId],
+    ) -> Result<(), DomainError>;
+
     // ============================================
     // Operations
     // ============================================
