@@ -10,7 +10,7 @@ import { useSessionStore } from '../../infra/state/sessionStore';
 import { useBoardStore } from '../../infra/state/boardStore';
 import { useOpQueueStore } from '../../infra/sync/opQueueCache';
 import { useConflictStore, createConflictDetail } from '../../infra/sync/conflictStore';
-import type { BootstrapResponse, ProjectBootstrapResponse } from '../../app/dtos/BootstrapDto';
+import type { BootstrapResponse, ProjectBootstrapResponse } from '../../application/dtos/BootstrapDto';
 
 /**
  * グローバルBootstrapの取得と初期化
