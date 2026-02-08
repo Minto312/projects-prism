@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["src/**"]
+    "includes": ["src/**", "*.config.ts"]
   },
   "formatter": {
     "indentStyle": "space",
@@ -16,7 +16,10 @@
   },
   "linter": {
     "rules": {
-      "recommended": true
+      "recommended": true,
+      "nursery": {
+        "noFloatingPromises": "error"
+      }
     }
   },
   "assist": {
@@ -24,6 +27,14 @@
       "source": {
         "organizeImports": "on"
       }
+    }
+  },
+  "css": {
+    "linter": {
+      "enabled": true
+    },
+    "formatter": {
+      "enabled": true
     }
   },
   "javascript": {
