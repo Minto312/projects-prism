@@ -69,11 +69,10 @@ export function useLoadBootstrap() {
 export function useLoadProjectBootstrap(projectId: string | null) {
   const query = useProjectBootstrapQuery(projectId);
   const refreshMutation = useRefreshProjectBootstrap();
-  const initializeBoard = useBoardStore((state) => state.initializeBoard);
-  const setActiveProject = useBoardStore((state) => state.setActiveProject);
   const [initError, setInitError] = useState<string | null>(null);
 
   const initializeFromProjectBootstrap = useCallback((data: ProjectBootstrapResponse) => {
+    const { initializeBoard, setActiveProject } = useBoardStore.getState();
     initializeBoard(
       data.project,
       data.statusField,
@@ -81,7 +80,7 @@ export function useLoadProjectBootstrap(projectId: string | null) {
       data.tasks
     );
     setActiveProject(data.project.id);
-  }, [initializeBoard, setActiveProject]);
+  }, []);
 
   // Bootstrap成功時にボードを初期化
   useEffect(() => {
