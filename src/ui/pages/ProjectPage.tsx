@@ -5,7 +5,7 @@
  */
 
 import { useSessionStore } from '../../infra/state/sessionStore';
-import { useBoardStore, boardSelectors } from '../../infra/state/boardStore';
+import { useBoardStore } from '../../infra/state/boardStore';
 import { useLoadProjectBootstrap } from '../hooks/useLoadBootstrap';
 import { useMoveTask } from '../hooks/useMoveTask';
 import { KanbanBoard } from '../components/kanban/KanbanBoard';
@@ -18,7 +18,7 @@ export function ProjectPage() {
 
   const { data, isLoading, isError, errorMessage } = useLoadProjectBootstrap(projectId);
   const board = useBoardStore(
-    projectId ? boardSelectors.board(projectId) : () => null
+    (state) => projectId ? state.boards[projectId] ?? null : null
   );
 
   const { moveTask, changeTaskStatus } = useMoveTask({

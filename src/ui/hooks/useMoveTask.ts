@@ -34,10 +34,8 @@ export function useMoveTask({
   projectId,
   statusField,
 }: UseMoveTaskOptions): UseMoveTaskResult {
-  const { moveTask: moveTaskInBoard, tasks } = useBoardStore((state) => ({
-    moveTask: state.moveTask,
-    tasks: state.boards[projectId]?.tasks ?? {},
-  }));
+  const moveTaskInBoard = useBoardStore((state) => state.moveTask);
+  const tasks = useBoardStore((state) => state.boards[projectId]?.tasks);
 
   const moveTask = useCallback(
     async (
@@ -51,7 +49,7 @@ export function useMoveTask({
         return;
       }
 
-      const task = tasks[taskId];
+      const task = tasks?.[taskId];
       if (!task) {
         console.error(`Task not found: ${taskId}`);
         return;
