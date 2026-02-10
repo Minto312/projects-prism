@@ -4,7 +4,7 @@
  * Bootstrap データの取得と管理
  */
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { useBootstrapQuery, useProjectBootstrapQuery, useRefreshBootstrap, useRefreshProjectBootstrap } from '../../infra/query/bootstrapQuery';
 import { useSessionStore } from '../../infra/state/sessionStore';
 import { useBoardStore } from '../../infra/state/boardStore';
@@ -71,6 +71,7 @@ export function useLoadProjectBootstrap(projectId: string | null) {
   const refreshMutation = useRefreshProjectBootstrap();
   const initializeBoard = useBoardStore((state) => state.initializeBoard);
   const setActiveProject = useBoardStore((state) => state.setActiveProject);
+  const [initError, setInitError] = useState<string | null>(null);
 
   const initializeFromProjectBootstrap = useCallback((data: ProjectBootstrapResponse) => {
     initializeBoard(
@@ -85,22 +86,44 @@ export function useLoadProjectBootstrap(projectId: string | null) {
   // Bootstrap成功時にボードを初期化
   useEffect(() => {
     if (query.data && projectId) {
-      initializeFromProjectBootstrap(query.data);
+      try {
+        setInitError(null);
+        initializeFromProjectBootstrap(query.data);
+      } catch (e) {
+        console.error('Failed to initialize board:', e);
+        setInitError(e instanceof Error ? e.message : String(e));
+      }
     }
   }, [query.data, projectId, initializeFromProjectBootstrap]);
+
+  // projectId変更時にinitErrorをリセット
+  useEffect(() => {
+    setInitError(null);
+  }, [projectId]);
 
   const refresh = async () => {
     if (!projectId) return null;
     const data = await refreshMutation.mutateAsync(projectId);
-    initializeFromProjectBootstrap(data);
+    try {
+      setInitError(null);
+      initializeFromProjectBootstrap(data);
+    } catch (e) {
+      console.error('Failed to initialize board on refresh:', e);
+      setInitError(e instanceof Error ? e.message : String(e));
+    }
     return data;
   };
+
+  // Tauriはエラーを文字列で返すため、Error.messageではなくそのまま取得
+  const queryError = query.error;
+  const errorMessage = initError
+    ?? (queryError instanceof Error ? queryError.message : typeof queryError === 'string' ? queryError : null);
 
   return {
     data: query.data,
     isLoading: query.isLoading,
-    isError: query.isError,
-    error: query.error,
+    isError: query.isError || initError !== null,
+    errorMessage,
     isRefreshing: refreshMutation.isPending,
     refresh,
   };

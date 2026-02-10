@@ -12,9 +12,11 @@ import { MyTasksPage } from './ui/pages/MyTasksPage';
 import { ProjectPage } from './ui/pages/ProjectPage';
 import { SettingsPage } from './ui/pages/SettingsPage';
 import { PageSpinner } from './ui/components/common/Spinner';
+import { ErrorBoundary } from './ui/components/common/ErrorBoundary';
 
 function AppContent() {
   const currentView = useSessionStore((state) => state.currentView);
+  const selectedProject = useSessionStore((state) => state.selectedProject);
   const isInitialized = useSessionStore((state) => state.isInitialized);
 
   const { data, isLoading, isRefreshing, refresh } = useLoadBootstrap();
@@ -64,7 +66,9 @@ function AppContent() {
       isRefreshing={isRefreshing}
       isSyncing={isSyncing}
     >
-      {renderPage()}
+      <ErrorBoundary key={`${currentView}-${selectedProject?.id ?? ''}`}>
+        {renderPage()}
+      </ErrorBoundary>
     </MainLayout>
   );
 }

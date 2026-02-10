@@ -16,7 +16,7 @@ export function ProjectPage() {
   const selectedProject = useSessionStore((state) => state.selectedProject);
   const projectId = selectedProject?.id ?? null;
 
-  const { data, isLoading, isError, error } = useLoadProjectBootstrap(projectId);
+  const { data, isLoading, isError, errorMessage } = useLoadProjectBootstrap(projectId);
   const board = useBoardStore(
     projectId ? boardSelectors.board(projectId) : () => null
   );
@@ -64,7 +64,7 @@ export function ProjectPage() {
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
           <p className="text-red-600">
-            {error?.message ?? 'プロジェクトの取得に失敗しました'}
+            {errorMessage ?? 'プロジェクトの取得に失敗しました'}
           </p>
         </div>
       </div>
