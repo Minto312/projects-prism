@@ -26,8 +26,11 @@ jobs:
           # patch +1 + nightly suffix で stable < nightly < next_stable
           IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
           NIGHTLY_PATCH=$((PATCH + 1))
-          TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
-          NIGHTLY_VERSION="${MAJOR}.${MINOR}.${NIGHTLY_PATCH}-nightly.${TIMESTAMP}"
+          # MSI互換フォーマット: 各セグメントが数値かつ ≤ 65535 である必要がある
+          # YYDDD (年*1000+通日, 2065年まで安全) と日内分数 (max 1439) を使用
+          COMPACT_DATE=$(($(date -u +%-y) * 1000 + $(date -u +%-j)))
+          MINS_OF_DAY=$(($(date -u +%-H) * 60 + $(date -u +%-M)))
+          NIGHTLY_VERSION="${MAJOR}.${MINOR}.${NIGHTLY_PATCH}-${COMPACT_DATE}.${MINS_OF_DAY}"
           echo "nightly_version=${NIGHTLY_VERSION}" >> "$GITHUB_OUTPUT"
           echo "Nightly version: ${NIGHTLY_VERSION}"
 
