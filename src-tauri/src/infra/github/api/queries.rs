@@ -7,26 +7,6 @@ query {
 }
 "#;
 
-/// ユーザーのプロジェクト一覧取得
-pub const USER_PROJECTS_QUERY: &str = r#"
-query($login: String!, $after: String) {
-  user(login: $login) {
-    projectsV2(first: 20, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}) {
-      pageInfo {
-        hasNextPage
-        endCursor
-      }
-      nodes {
-        id
-        title
-        url
-        updatedAt
-      }
-    }
-  }
-}
-"#;
-
 /// Organization のプロジェクト一覧取得
 pub const ORG_PROJECTS_QUERY: &str = r#"
 query($login: String!, $after: String) {
@@ -47,7 +27,7 @@ query($login: String!, $after: String) {
 }
 "#;
 
-/// viewer がアクセス可能な全プロジェクトの一覧（Organization含む）
+/// viewer がアクセス可能なプロジェクトの一覧（viewer 所有のみ）
 pub const VIEWER_PROJECTS_QUERY: &str = r#"
 query($after: String) {
   viewer {
@@ -198,6 +178,23 @@ mutation($input: UpdateProjectV2ItemFieldValueInput!) {
     projectV2Item {
       id
       updatedAt
+    }
+  }
+}
+"#;
+
+/// viewer が所属する Organization 一覧取得
+pub const VIEWER_ORGANIZATIONS_QUERY: &str = r#"
+query($after: String) {
+  viewer {
+    organizations(first: 100, after: $after) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        login
+      }
     }
   }
 }
