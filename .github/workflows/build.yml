@@ -19,7 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: ubuntu-22.04
+          - platform: ubuntu-24.04
             rust_target: x86_64-unknown-linux-gnu
           - platform: windows-latest
             rust_target: x86_64-pc-windows-msvc
@@ -47,7 +47,7 @@ jobs:
           workspaces: src-tauri -> target
 
       - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
+        if: matrix.platform == 'ubuntu-24.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -70,7 +70,7 @@ jobs:
           args: --target ${{ matrix.rust_target }}
 
       - name: Upload artifacts (Linux)
-        if: matrix.platform == 'ubuntu-22.04'
+        if: matrix.platform == 'ubuntu-24.04'
         uses: actions/upload-artifact@v4
         with:
           name: prism-linux
