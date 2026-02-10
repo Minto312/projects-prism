@@ -100,11 +100,14 @@ jobs:
             conf.version = process.env.NIGHTLY_VERSION;
             fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(conf, null, 2) + '\n');
           "
-          # Cargo.toml
+          # Cargo.toml ([package] セクション内の version のみ置換)
           node -e "
             const fs = require('fs');
             let toml = fs.readFileSync('src-tauri/Cargo.toml', 'utf8');
-            toml = toml.replace(/^version = \".*\"/m, 'version = \"' + process.env.NIGHTLY_VERSION + '\"');
+            toml = toml.replace(
+              /(\[package\][\s\S]*?)version = \".*?\"/,
+              '\$1version = \"' + process.env.NIGHTLY_VERSION + '\"'
+            );
             fs.writeFileSync('src-tauri/Cargo.toml', toml);
           "
 
