@@ -73,3 +73,33 @@ export function useHasPatQuery() {
     },
   });
 }
+
+/**
+ * 非表示プロジェクトIDリストを取得
+ */
+export function useHiddenProjectIdsQuery() {
+  return useQuery<string[], Error>({
+    queryKey: queryKeys.settings.hiddenProjectIds(),
+    queryFn: async () => {
+      const { settingsApi } = await import('../tauri/client');
+      return settingsApi.getHiddenProjectIds();
+    },
+  });
+}
+
+/**
+ * 非表示プロジェクトIDリストを更新
+ */
+export function useSetHiddenProjectIds() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, string[]>({
+    mutationFn: async (ids: string[]) => {
+      const { settingsApi } = await import('../tauri/client');
+      return settingsApi.setHiddenProjectIds(ids);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.settings.hiddenProjectIds() });
+    },
+  });
+}

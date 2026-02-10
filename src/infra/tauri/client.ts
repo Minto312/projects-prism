@@ -102,6 +102,16 @@ export interface TauriCommands {
    * デバッグログを取得
    */
   get_debug_logs: () => Promise<string>;
+
+  /**
+   * 非表示プロジェクトIDリストを取得
+   */
+  get_hidden_project_ids: () => Promise<string[]>;
+
+  /**
+   * 非表示プロジェクトIDリストを設定
+   */
+  set_hidden_project_ids: (args: { ids: string[] }) => Promise<void>;
 }
 
 /**
@@ -149,6 +159,8 @@ export const settingsApi = {
   setPat: (pat: string) => tauriInvoke('set_pat', { pat }),
   hasPat: () => tauriInvoke('has_pat'),
   clearPat: () => tauriInvoke('clear_pat'),
+  getHiddenProjectIds: () => tauriInvoke('get_hidden_project_ids'),
+  setHiddenProjectIds: (ids: string[]) => tauriInvoke('set_hidden_project_ids', { ids }),
 };
 
 /**
