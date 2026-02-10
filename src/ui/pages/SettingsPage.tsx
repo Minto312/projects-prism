@@ -7,7 +7,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { getVersion } from '@tauri-apps/api/app';
-import { settingsApi } from '../../infra/tauri/client';
+import { settingsApi, debugApi } from '../../infra/tauri/client';
 import { useHasPatQuery } from '../../infra/query/bootstrapQuery';
 import { queryKeys } from '../../infra/query/keys';
 import { useAppUpdater } from '../hooks/useAppUpdater';
@@ -22,6 +22,8 @@ export function SettingsPage() {
   const [patInput, setPatInput] = useState('');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [appVersion, setAppVersion] = useState<string | null>(null);
+  const [debugLogs, setDebugLogs] = useState<string>('');
+  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
 
   const {
     status: updateStatus,
@@ -40,6 +42,25 @@ export function SettingsPage() {
   useEffect(() => {
     getVersion().then(setAppVersion).catch(() => {});
   }, []);
+
+  // Nightlyチャンネル時にデバッグログを自動読み込み
+  const loadDebugLogs = useCallback(async () => {
+    setIsLoadingLogs(true);
+    try {
+      const logs = await debugApi.getDebugLogs();
+      setDebugLogs(logs);
+    } catch {
+      setDebugLogs('ログの読み込みに失敗しました');
+    } finally {
+      setIsLoadingLogs(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (channel === 'nightly') {
+      loadDebugLogs();
+    }
+  }, [channel, loadDebugLogs]);
 
   // PAT設定のミューテーション
   const setPatMutation = useMutation({
@@ -367,6 +388,25 @@ export function SettingsPage() {
           )}
         </div>
       </section>
+
+      {/* デバッグログ（Nightlyのみ表示） */}
+      {channel === 'nightly' && (
+        <section className="mt-6 rounded-lg border border-gray-200 bg-white p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">デバッグログ</h2>
+            <Button
+              variant="secondary"
+              onClick={loadDebugLogs}
+              isLoading={isLoadingLogs}
+            >
+              更新
+            </Button>
+          </div>
+          <pre className="max-h-96 overflow-auto rounded-md bg-gray-900 p-4 text-xs leading-relaxed text-gray-100">
+            {debugLogs || 'ログはありません'}
+          </pre>
+        </section>
+      )}
 
       {/* PAT削除確認ダイアログ */}
       <ConfirmModal

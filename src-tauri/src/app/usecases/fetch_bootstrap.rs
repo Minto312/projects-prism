@@ -28,6 +28,7 @@ pub struct FetchBootstrapUseCase;
 impl FetchBootstrapUseCase {
     /// キャッシュからブートストラップデータを取得（refresh=false時）
     pub fn from_cache(persistence: &dyn PersistencePort) -> Result<BootstrapResponse, DomainError> {
+        log::debug!("fetch_bootstrap: キャッシュから読み込み");
         let projects = persistence.get_all_projects()?;
         let status_fields = persistence.get_all_status_fields()?;
         let status_options = persistence.get_all_status_options()?;
@@ -63,15 +64,18 @@ impl FetchBootstrapUseCase {
         github: &dyn GitHubPort,
         persistence: &dyn PersistencePort,
     ) -> Result<BootstrapResponse, DomainError> {
+        log::info!("fetch_bootstrap: GitHubからリフレッシュ開始");
         let pat = persistence
             .get_setting("github_pat")?
             .ok_or_else(|| DomainError::Authentication("PAT is not configured".to_string()))?;
 
         // ユーザー検証
         let current_user_login = github.validate_token(&pat).await?;
+        log::debug!("fetch_bootstrap: ユーザー検証完了 login={}", current_user_login);
 
         // GitHub から全データを先に取得（DB書き込みなし）
         let projects = github.fetch_projects(&pat).await?;
+        log::debug!("fetch_bootstrap: プロジェクト取得 count={}", projects.len());
         let project_ids: Vec<String> = projects.iter().map(|p| p.id.clone()).collect();
 
         let mut all_project_data = Vec::new();
@@ -143,6 +147,7 @@ impl FetchBootstrapUseCase {
                 })
             }
             Err(e) => {
+                log::error!("fetch_bootstrap: キャッシュ更新失敗、ロールバック - {}", e);
                 let _ = persistence.rollback_transaction();
                 Err(e)
             }
@@ -202,6 +207,7 @@ impl FetchBootstrapUseCase {
         persistence: &dyn PersistencePort,
         project_id: &str,
     ) -> Result<ProjectBootstrapResponse, DomainError> {
+        log::info!("fetch_bootstrap: プロジェクトリフレッシュ project_id={}", project_id);
         let pat = persistence
             .get_setting("github_pat")?
             .ok_or_else(|| DomainError::Authentication("PAT is not configured".to_string()))?;
