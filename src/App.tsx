@@ -4,9 +4,11 @@
  * アプリケーションのルートコンポーネント
  */
 
+import { useMemo } from 'react';
 import { useSessionStore } from './infra/state/sessionStore';
 import { useLoadBootstrap } from './ui/hooks/useLoadBootstrap';
 import { useSyncOperations } from './ui/hooks/useSyncOperations';
+import { useHiddenProjectIdsQuery } from './infra/query/bootstrapQuery';
 import { MainLayout } from './ui/components/layout/MainLayout';
 import { MyTasksPage } from './ui/pages/MyTasksPage';
 import { ProjectPage } from './ui/pages/ProjectPage';
@@ -19,6 +21,12 @@ function AppContent() {
 
   const { data, isLoading, isRefreshing, refresh } = useLoadBootstrap();
   const { syncNow, isSyncing, pendingCount } = useSyncOperations();
+  const { data: hiddenProjectIds = [] } = useHiddenProjectIdsQuery();
+
+  const visibleProjects = useMemo(
+    () => (data?.projects ?? []).filter((p) => !hiddenProjectIds.includes(p.id)),
+    [data?.projects, hiddenProjectIds]
+  );
 
   // 初期化中
   if (isLoading && !isInitialized) {
@@ -57,7 +65,7 @@ function AppContent() {
 
   return (
     <MainLayout
-      projects={data?.projects ?? []}
+      projects={visibleProjects}
       isProjectsLoading={isLoading}
       onRefresh={handleRefresh}
       onSync={handleSync}

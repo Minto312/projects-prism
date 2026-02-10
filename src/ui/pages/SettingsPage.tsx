@@ -8,7 +8,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { getVersion } from '@tauri-apps/api/app';
 import { settingsApi, debugApi } from '../../infra/tauri/client';
-import { useHasPatQuery } from '../../infra/query/bootstrapQuery';
+import { useHasPatQuery, useBootstrapQuery, useHiddenProjectIdsQuery, useSetHiddenProjectIds } from '../../infra/query/bootstrapQuery';
 import { queryKeys } from '../../infra/query/keys';
 import { useAppUpdater } from '../hooks/useAppUpdater';
 import { Button } from '../components/common/Button';
@@ -18,6 +18,9 @@ import { PageSpinner } from '../components/common/Spinner';
 export function SettingsPage() {
   const queryClient = useQueryClient();
   const { data: hasPat, isLoading: isCheckingPat } = useHasPatQuery();
+  const { data: bootstrapData } = useBootstrapQuery();
+  const { data: hiddenProjectIds = [] } = useHiddenProjectIdsQuery();
+  const setHiddenProjectIds = useSetHiddenProjectIds();
 
   const [patInput, setPatInput] = useState('');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -94,6 +97,17 @@ export function SettingsPage() {
   const handleClearPat = useCallback(async () => {
     await clearPatMutation.mutateAsync();
   }, [clearPatMutation]);
+
+  const handleToggleProject = useCallback(
+    (projectId: string) => {
+      const isHidden = hiddenProjectIds.includes(projectId);
+      const newIds = isHidden
+        ? hiddenProjectIds.filter((id) => id !== projectId)
+        : [...hiddenProjectIds, projectId];
+      setHiddenProjectIds.mutate(newIds);
+    },
+    [hiddenProjectIds, setHiddenProjectIds]
+  );
 
   if (isCheckingPat) {
     return <PageSpinner />;
@@ -209,6 +223,53 @@ export function SettingsPage() {
           </ol>
         </div>
       </section>
+
+      {/* プロジェクト表示 */}
+      {bootstrapData?.projects && bootstrapData.projects.length > 0 && (
+        <section className="mt-6 rounded-lg border border-gray-200 bg-white p-6">
+          <h2 className="mb-4 text-lg font-semibold text-gray-900">
+            プロジェクト表示
+          </h2>
+          <p className="mb-4 text-sm text-gray-600">
+            サイドバーに表示するプロジェクトを選択してください。
+          </p>
+          <div className="space-y-3">
+            {bootstrapData.projects.map((project) => {
+              const isVisible = !hiddenProjectIds.includes(project.id);
+              return (
+                <label
+                  key={project.id}
+                  className="flex items-center justify-between rounded-md border border-gray-100 px-4 py-3 hover:bg-gray-50 cursor-pointer"
+                >
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-gray-900">
+                      {project.title}
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      {project.ownerLogin}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={isVisible}
+                    onClick={() => handleToggleProject(project.id)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                      isVisible ? 'bg-blue-600' : 'bg-gray-200'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        isVisible ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </label>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* アプリケーション更新 */}
       <section className="mt-6 rounded-lg border border-gray-200 bg-white p-6">

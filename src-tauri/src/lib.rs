@@ -64,6 +64,8 @@ pub fn run() {
             interface::tauri::commands::settings::set_pat,
             interface::tauri::commands::settings::has_pat,
             interface::tauri::commands::settings::clear_pat,
+            interface::tauri::commands::settings::get_hidden_project_ids,
+            interface::tauri::commands::settings::set_hidden_project_ids,
             interface::tauri::commands::updater::get_update_channel,
             interface::tauri::commands::updater::set_update_channel,
             interface::tauri::commands::updater::check_for_update,

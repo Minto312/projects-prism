@@ -35,3 +35,29 @@ pub async fn clear_pat(state: State<'_, AppState>) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     Ok(())
 }
+
+#[tauri::command]
+pub async fn get_hidden_project_ids(state: State<'_, AppState>) -> Result<Vec<String>, String> {
+    let value = state
+        .persistence
+        .get_setting("hidden_project_ids")
+        .map_err(|e| e.to_string())?;
+    match value {
+        Some(json_str) => {
+            serde_json::from_str::<Vec<String>>(&json_str).map_err(|e| e.to_string())
+        }
+        None => Ok(vec![]),
+    }
+}
+
+#[tauri::command]
+pub async fn set_hidden_project_ids(
+    state: State<'_, AppState>,
+    ids: Vec<String>,
+) -> Result<(), String> {
+    let json_str = serde_json::to_string(&ids).map_err(|e| e.to_string())?;
+    state
+        .persistence
+        .set_setting("hidden_project_ids", &json_str)
+        .map_err(|e| e.to_string())
+}

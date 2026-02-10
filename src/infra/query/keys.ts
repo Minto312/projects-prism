@@ -55,6 +55,7 @@ export const queryKeys = {
   settings: {
     all: ['settings'] as const,
     hasPat: () => [...queryKeys.settings.all, 'hasPat'] as const,
+    hiddenProjectIds: () => [...queryKeys.settings.all, 'hiddenProjectIds'] as const,
   },
 } as const;
 
