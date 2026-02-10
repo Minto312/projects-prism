@@ -77,6 +77,26 @@ export interface TauriCommands {
    * PAT を削除
    */
   clear_pat: () => Promise<void>;
+
+  /**
+   * 更新チャネルを取得
+   */
+  get_update_channel: () => Promise<string>;
+
+  /**
+   * 更新チャネルを設定
+   */
+  set_update_channel: (args: { channel: string }) => Promise<void>;
+
+  /**
+   * 更新を確認
+   */
+  check_for_update: () => Promise<{ version: string; body: string | null } | null>;
+
+  /**
+   * 更新をダウンロード・インストール
+   */
+  download_and_install_update: () => Promise<void>;
 }
 
 /**
@@ -124,4 +144,14 @@ export const settingsApi = {
   setPat: (pat: string) => tauriInvoke('set_pat', { pat }),
   hasPat: () => tauriInvoke('has_pat'),
   clearPat: () => tauriInvoke('clear_pat'),
+};
+
+/**
+ * Updater API
+ */
+export const updaterApi = {
+  getUpdateChannel: () => tauriInvoke('get_update_channel'),
+  setUpdateChannel: (channel: string) => tauriInvoke('set_update_channel', { channel }),
+  checkForUpdate: () => tauriInvoke('check_for_update'),
+  downloadAndInstallUpdate: () => tauriInvoke('download_and_install_update'),
 };

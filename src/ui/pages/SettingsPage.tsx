@@ -4,11 +4,13 @@
  * 設定画面 - PAT設定など
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { getVersion } from '@tauri-apps/api/app';
 import { settingsApi } from '../../infra/tauri/client';
 import { useHasPatQuery } from '../../infra/query/bootstrapQuery';
 import { queryKeys } from '../../infra/query/keys';
+import { useAppUpdater } from '../hooks/useAppUpdater';
 import { Button } from '../components/common/Button';
 import { ConfirmModal } from '../components/common/Modal';
 import { PageSpinner } from '../components/common/Spinner';
@@ -19,6 +21,25 @@ export function SettingsPage() {
 
   const [patInput, setPatInput] = useState('');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
+
+  const {
+    status: updateStatus,
+    updateVersion,
+    updateBody,
+    downloadProgress,
+    error: updateError,
+    channel,
+    setChannel,
+    checkForUpdate,
+    downloadAndInstall,
+    restartApp,
+  } = useAppUpdater();
+
+  // アプリバージョンを取得
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(() => {});
+  }, []);
 
   // PAT設定のミューテーション
   const setPatMutation = useMutation({
@@ -165,6 +186,194 @@ export function SettingsPage() {
             </li>
             <li>トークンを生成してコピー</li>
           </ol>
+        </div>
+      </section>
+
+      {/* アプリケーション更新 */}
+      <section className="mt-6 rounded-lg border border-gray-200 bg-white p-6">
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">
+          アプリケーション更新
+        </h2>
+
+        <div className="mb-4 text-sm text-gray-600">
+          現在のバージョン:{' '}
+          <span className="font-mono font-medium text-gray-900">
+            v{appVersion ?? '...'}
+          </span>
+        </div>
+
+        {/* チャネル切り替え */}
+        <div className="mb-4">
+          <label className="mb-2 block text-sm font-medium text-gray-700">
+            更新チャネル
+          </label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setChannel('stable')}
+              disabled={updateStatus === 'downloading' || updateStatus === 'installing'}
+              className={`rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                channel === 'stable'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Stable
+            </button>
+            <button
+              type="button"
+              onClick={() => setChannel('nightly')}
+              disabled={updateStatus === 'downloading' || updateStatus === 'installing'}
+              className={`rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                channel === 'nightly'
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Nightly
+            </button>
+          </div>
+          {channel === 'nightly' && (
+            <p className="mt-2 text-xs text-orange-600">
+              Nightly ビルドは開発中の最新機能を含みますが、不安定な場合があります。
+            </p>
+          )}
+        </div>
+
+        {/* ステータス表示 */}
+        {updateStatus === 'up-to-date' && (
+          <div className="mb-4 flex items-center gap-2 rounded-md bg-green-50 p-3">
+            <svg
+              className="h-5 w-5 text-green-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+            <span className="text-sm font-medium text-green-800">
+              最新バージョンです
+            </span>
+          </div>
+        )}
+
+        {updateStatus === 'available' && updateVersion && (
+          <div className="mb-4 rounded-md bg-blue-50 p-3">
+            <div className="flex items-center gap-2">
+              <svg
+                className="h-5 w-5 text-blue-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <span className="text-sm font-medium text-blue-800">
+                新しいバージョンが利用可能です: v{updateVersion}
+              </span>
+            </div>
+            {updateBody && (
+              <p className="mt-2 text-sm text-blue-700 whitespace-pre-wrap">
+                {updateBody}
+              </p>
+            )}
+          </div>
+        )}
+
+        {updateStatus === 'downloading' && (
+          <div className="mb-4">
+            <div className="mb-1 flex justify-between text-sm text-gray-600">
+              <span>ダウンロード中...</span>
+              {downloadProgress != null && <span>{downloadProgress}%</span>}
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+              {downloadProgress != null ? (
+                <div
+                  className="h-full rounded-full bg-blue-600 transition-all duration-300"
+                  style={{ width: `${downloadProgress}%` }}
+                />
+              ) : (
+                <div className="h-full w-full animate-pulse rounded-full bg-blue-400" />
+              )}
+            </div>
+          </div>
+        )}
+
+        {updateStatus === 'installing' && (
+          <div className="mb-4 flex items-center gap-2 rounded-md bg-yellow-50 p-3">
+            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-yellow-600 border-t-transparent" />
+            <span className="text-sm font-medium text-yellow-800">
+              インストール中...
+            </span>
+          </div>
+        )}
+
+        {updateStatus === 'done' && (
+          <div className="mb-4 flex items-center gap-2 rounded-md bg-green-50 p-3">
+            <svg
+              className="h-5 w-5 text-green-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+            <span className="text-sm font-medium text-green-800">
+              更新のインストールが完了しました。再起動してください。
+            </span>
+          </div>
+        )}
+
+        {updateStatus === 'error' && updateError && (
+          <div className="mb-4 rounded-md bg-red-50 p-3">
+            <p className="text-sm text-red-600">{updateError}</p>
+          </div>
+        )}
+
+        {/* アクションボタン */}
+        <div className="flex gap-3">
+          {(updateStatus === 'idle' || updateStatus === 'checking' || updateStatus === 'up-to-date' || updateStatus === 'error') && (
+            <Button
+              variant="secondary"
+              onClick={checkForUpdate}
+              isLoading={updateStatus === 'checking'}
+            >
+              更新を確認
+            </Button>
+          )}
+
+          {updateStatus === 'available' && (
+            <Button
+              variant="primary"
+              onClick={downloadAndInstall}
+            >
+              更新をインストール
+            </Button>
+          )}
+
+          {updateStatus === 'done' && (
+            <Button
+              variant="primary"
+              onClick={restartApp}
+            >
+              再起動
+            </Button>
+          )}
         </div>
       </section>
 

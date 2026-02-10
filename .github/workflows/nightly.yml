@@ -1,0 +1,123 @@
+name: Nightly
+
+on:
+  push:
+    branches:
+      - develop
+
+concurrency:
+  group: nightly-release
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      nightly_version: ${{ steps.version.outputs.nightly_version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate nightly version
+        id: version
+        run: |
+          BASE_VERSION=$(node -p "require('./package.json').version")
+          # patch +1 + nightly suffix で stable < nightly < next_stable
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
+          NIGHTLY_PATCH=$((PATCH + 1))
+          TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
+          NIGHTLY_VERSION="${MAJOR}.${MINOR}.${NIGHTLY_PATCH}-nightly.${TIMESTAMP}"
+          echo "nightly_version=${NIGHTLY_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Nightly version: ${NIGHTLY_VERSION}"
+
+      - name: Delete existing nightly release
+        run: gh release delete nightly --cleanup-tag --yes || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
+    needs: prepare
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-22.04
+            args: ''
+          - platform: windows-latest
+            args: ''
+          - platform: macos-latest
+            args: '--target aarch64-apple-darwin'
+          - platform: macos-latest
+            args: '--target x86_64-apple-darwin'
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies (Ubuntu)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Set nightly version
+        env:
+          NIGHTLY_VERSION: ${{ needs.prepare.outputs.nightly_version }}
+        run: |
+          # package.json
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = process.env.NIGHTLY_VERSION;
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+          # tauri.conf.json
+          node -e "
+            const fs = require('fs');
+            const conf = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
+            conf.version = process.env.NIGHTLY_VERSION;
+            fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(conf, null, 2) + '\n');
+          "
+          # Cargo.toml
+          node -e "
+            const fs = require('fs');
+            let toml = fs.readFileSync('src-tauri/Cargo.toml', 'utf8');
+            toml = toml.replace(/^version = \".*\"/m, 'version = \"' + process.env.NIGHTLY_VERSION + '\"');
+            fs.writeFileSync('src-tauri/Cargo.toml', toml);
+          "
+
+      - name: Build and release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: nightly
+          releaseName: 'Prism Nightly'
+          releaseBody: 'Automated nightly build from develop branch.'
+          releaseDraft: false
+          prerelease: true
+          args: ${{ matrix.args }}
