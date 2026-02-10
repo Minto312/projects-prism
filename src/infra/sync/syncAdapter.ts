@@ -4,9 +4,9 @@
  * SyncPort の実装
  */
 
-import type { SyncPort } from '../../app/ports/SyncPort';
+import type { SyncPort } from '../../application/ports/SyncPort';
 import type { Operation } from '../../ui_domain/ops/MoveItemToColumn';
-import type { SyncState, SyncResult, AppendOperationInput } from '../../app/dtos/SyncDto';
+import type { SyncState, SyncResult, AppendOperationInput } from '../../application/dtos/SyncDto';
 import { syncApi } from '../tauri/client';
 import { useOpQueueStore } from './opQueueCache';
 import { useConflictStore, createConflictDetail } from './conflictStore';

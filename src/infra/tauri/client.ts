@@ -5,8 +5,8 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
-import type { BootstrapResponse, ProjectBootstrapResponse } from '../../app/dtos/BootstrapDto';
-import type { SyncState, SyncResult, AppendOperationInput } from '../../app/dtos/SyncDto';
+import type { BootstrapResponse, ProjectBootstrapResponse } from '../../application/dtos/BootstrapDto';
+import type { SyncState, SyncResult, AppendOperationInput } from '../../application/dtos/SyncDto';
 import type { Operation } from '../../ui_domain/ops/MoveItemToColumn';
 
 /**

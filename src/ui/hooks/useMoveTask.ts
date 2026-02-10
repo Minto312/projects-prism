@@ -9,7 +9,7 @@ import { useBoardStore } from '../../infra/state/boardStore';
 import { getSyncAdapter } from '../../infra/sync/syncAdapter';
 import type { Task } from '../../ui_domain/model/Task';
 import type { StatusField } from '../../ui_domain/model/Project';
-import { createMoveTaskOperation } from '../../app/usecases/moveTask';
+import { createMoveTaskOperation } from '../../application/usecases/moveTask';
 
 export interface UseMoveTaskOptions {
   projectId: string;

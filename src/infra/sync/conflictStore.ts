@@ -5,7 +5,7 @@
  */
 
 import { create } from 'zustand';
-import type { ConflictInfo } from '../../app/dtos/BootstrapDto';
+import type { ConflictInfo } from '../../application/dtos/BootstrapDto';
 
 /**
  * 拡張コンフリクト情報（UI表示用）

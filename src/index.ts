@@ -8,7 +8,7 @@
 export * from './ui_domain';
 
 // App Layer
-export * from './app';
+export * from './application';
 
 // Infrastructure（必要に応じて）
 export { queryClient, getQueryClient } from './infra/query/queryClient';
