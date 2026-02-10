@@ -43,7 +43,9 @@ fn resolve_channel(state: &AppState) -> Result<String, String> {
 
 #[tauri::command]
 pub async fn get_update_channel(state: State<'_, AppState>) -> Result<String, String> {
-    resolve_channel(&state)
+    let channel = resolve_channel(&state)?;
+    log::debug!("get_update_channel: {}", channel);
+    Ok(channel)
 }
 
 #[tauri::command]
@@ -51,6 +53,7 @@ pub async fn set_update_channel(
     state: State<'_, AppState>,
     channel: String,
 ) -> Result<(), String> {
+    log::info!("set_update_channel: {} に変更", channel);
     if channel != "stable" && channel != "nightly" {
         return Err("Invalid channel. Must be \"stable\" or \"nightly\".".to_string());
     }
@@ -67,6 +70,7 @@ pub async fn check_for_update(
 ) -> Result<Option<UpdateInfo>, String> {
     let channel = resolve_channel(&state)?;
     let endpoint = endpoint_for_channel(&channel);
+    log::info!("check_for_update: channel={}", channel);
 
     let updater = app
         .updater_builder()
@@ -75,14 +79,23 @@ pub async fn check_for_update(
         .build()
         .map_err(|e| e.to_string())?;
 
-    let update = updater.check().await.map_err(|e| e.to_string())?;
+    let update = updater.check().await.map_err(|e| {
+        log::error!("check_for_update: 確認失敗 - {}", e);
+        e.to_string()
+    })?;
 
     match update {
-        Some(u) => Ok(Some(UpdateInfo {
-            version: u.version.clone(),
-            body: u.body.clone(),
-        })),
-        None => Ok(None),
+        Some(ref u) => {
+            log::info!("check_for_update: 更新あり version={}", u.version);
+            Ok(Some(UpdateInfo {
+                version: u.version.clone(),
+                body: u.body.clone(),
+            }))
+        }
+        None => {
+            log::info!("check_for_update: 最新です");
+            Ok(None)
+        }
     }
 }
 
@@ -93,6 +106,7 @@ pub async fn download_and_install_update(
 ) -> Result<(), String> {
     let channel = resolve_channel(&state)?;
     let endpoint = endpoint_for_channel(&channel);
+    log::info!("download_and_install_update: channel={}", channel);
 
     let updater = app
         .updater_builder()
@@ -107,6 +121,7 @@ pub async fn download_and_install_update(
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "No update available".to_string())?;
 
+    log::info!("download_and_install_update: ダウンロード開始 version={}", update.version);
     let app_handle = app.clone();
     update
         .download_and_install(
@@ -122,7 +137,11 @@ pub async fn download_and_install_update(
             || {},
         )
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            log::error!("download_and_install_update: 失敗 - {}", e);
+            e.to_string()
+        })?;
 
+    log::info!("download_and_install_update: インストール完了");
     Ok(())
 }

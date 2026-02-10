@@ -97,6 +97,11 @@ export interface TauriCommands {
    * 更新をダウンロード・インストール
    */
   download_and_install_update: () => Promise<void>;
+
+  /**
+   * デバッグログを取得
+   */
+  get_debug_logs: () => Promise<string>;
 }
 
 /**
@@ -154,4 +159,11 @@ export const updaterApi = {
   setUpdateChannel: (channel: string) => tauriInvoke('set_update_channel', { channel }),
   checkForUpdate: () => tauriInvoke('check_for_update'),
   downloadAndInstallUpdate: () => tauriInvoke('download_and_install_update'),
+};
+
+/**
+ * Debug API
+ */
+export const debugApi = {
+  getDebugLogs: () => tauriInvoke('get_debug_logs'),
 };

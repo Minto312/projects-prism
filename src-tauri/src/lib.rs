@@ -22,6 +22,11 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .level(log::LevelFilter::Debug)
+                .build(),
+        )
         .setup(|app| {
             let app_dir = app
                 .path()
@@ -63,6 +68,7 @@ pub fn run() {
             interface::tauri::commands::updater::set_update_channel,
             interface::tauri::commands::updater::check_for_update,
             interface::tauri::commands::updater::download_and_install_update,
+            interface::tauri::commands::debug::get_debug_logs,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

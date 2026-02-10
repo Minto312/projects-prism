@@ -15,6 +15,7 @@ impl SyncToGitHubUseCase {
             .ok_or_else(|| DomainError::Authentication("PAT is not configured".to_string()))?;
 
         let pending_ops = persistence.get_operations_by_status(&OperationStatus::Pending)?;
+        log::info!("sync_to_github: 保留中の操作数={}", pending_ops.len());
 
         let mut completed = Vec::new();
         let mut failed = Vec::new();
@@ -24,6 +25,7 @@ impl SyncToGitHubUseCase {
         persistence.set_setting("last_sync_attempt_at", &now.to_string())?;
 
         for mut op in pending_ops {
+            log::debug!("sync_to_github: 操作処理中 id={}", op.id);
             // ステータスを syncing に更新
             persistence.update_operation_status(&op.id, &OperationStatus::Syncing, None)?;
             op.status = OperationStatus::Syncing;
@@ -54,6 +56,7 @@ impl SyncToGitHubUseCase {
                             .await
                         {
                             Ok(()) => {
+                                log::info!("sync_to_github: 操作完了 id={}", op.id);
                                 persistence.update_operation_status(
                                     &op.id,
                                     &OperationStatus::Completed,
@@ -65,6 +68,7 @@ impl SyncToGitHubUseCase {
                             }
                             Err(e) => {
                                 let error_msg = e.to_string();
+                                log::error!("sync_to_github: mutation失敗 id={} error={}", op.id, error_msg);
                                 persistence.update_operation_status(
                                     &op.id,
                                     &OperationStatus::Failed,
@@ -79,6 +83,7 @@ impl SyncToGitHubUseCase {
                             }
                         }
                     } else {
+                        log::warn!("sync_to_github: コンフリクト検出 id={} expected={} actual={}", op.id, op.precondition.expected_from_option_id, current_id);
                         // precondition NG → conflict
                         // option 名をキャッシュから取得する（ベストエフォート）
                         let current_option_name = persistence
@@ -118,6 +123,7 @@ impl SyncToGitHubUseCase {
                     }
                 }
                 Err(DomainError::RateLimited { reset_at }) => {
+                    log::warn!("sync_to_github: レート制限 reset_at={}", reset_at);
                     // レート制限 → pending に戻して中断
                     persistence.update_operation_status(
                         &op.id,
@@ -128,6 +134,7 @@ impl SyncToGitHubUseCase {
                     break;
                 }
                 Err(DomainError::Authentication(_)) => {
+                    log::error!("sync_to_github: 認証エラー");
                     // 認証エラー → pending に戻して中断
                     persistence.update_operation_status(
                         &op.id,
@@ -138,6 +145,7 @@ impl SyncToGitHubUseCase {
                 }
                 Err(e) => {
                     let error_msg = e.to_string();
+                    log::error!("sync_to_github: 操作失敗 id={} error={}", op.id, error_msg);
                     persistence.update_operation_status(
                         &op.id,
                         &OperationStatus::Failed,

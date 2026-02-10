@@ -1,4 +1,5 @@
 pub mod bootstrap;
+pub mod debug;
 pub mod operations;
 pub mod settings;
 pub mod sync;

@@ -28,6 +28,7 @@ impl GitHubApiClient {
         query: &str,
         variables: Option<Value>,
     ) -> Result<Value, DomainError> {
+        log::debug!("github_api: GraphQLリクエスト送信");
         let mut body = json!({ "query": query });
         if let Some(vars) = variables {
             body["variables"] = vars;
@@ -41,11 +42,16 @@ impl GitHubApiClient {
             .json(&body)
             .send()
             .await
-            .map_err(|e| DomainError::Network(e.to_string()))?;
+            .map_err(|e| {
+                log::error!("github_api: ネットワークエラー - {}", e);
+                DomainError::Network(e.to_string())
+            })?;
 
         let status = response.status();
+        log::debug!("github_api: レスポンス status={}", status.as_u16());
 
         if status.as_u16() == 401 {
+            log::error!("github_api: 認証エラー (401)");
             return Err(DomainError::Authentication(
                 "Invalid or expired PAT".to_string(),
             ));
@@ -77,6 +83,7 @@ impl GitHubApiClient {
                     let reset_at = rate_limit_reset
                         .or(retry_after)
                         .unwrap_or_else(|| chrono::Utc::now().timestamp_millis() + 60 * 60 * 1000);
+                    log::warn!("github_api: レート制限 (403) reset_at={}", reset_at);
                     return Err(DomainError::RateLimited { reset_at });
                 }
             }
@@ -89,6 +96,7 @@ impl GitHubApiClient {
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
+            log::error!("github_api: HTTPエラー status={} body={}", status.as_u16(), body);
             return Err(DomainError::Api(format!(
                 "HTTP {}: {}",
                 status.as_u16(),
@@ -109,6 +117,7 @@ impl GitHubApiClient {
                     .filter_map(|e| e["message"].as_str())
                     .collect::<Vec<_>>()
                     .join("; ");
+                log::error!("github_api: GraphQLエラー - {}", error_msg);
                 return Err(DomainError::Api(error_msg));
             }
         }
