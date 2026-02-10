@@ -58,6 +58,73 @@ pub fn extract_viewer_projects(response: &Value) -> Result<(Vec<ProjectDto>, Opt
     Ok((projects, end_cursor))
 }
 
+/// viewer organizations クエリから Organization ログイン名一覧を抽出
+pub fn extract_viewer_organizations(response: &Value) -> Result<(Vec<String>, Option<String>), DomainError> {
+    let orgs_data = &response["data"]["viewer"]["organizations"];
+    let nodes = orgs_data["nodes"]
+        .as_array()
+        .ok_or_else(|| DomainError::Api("Failed to parse organizations nodes".to_string()))?;
+
+    let logins: Vec<String> = nodes
+        .iter()
+        .filter_map(|node| node["login"].as_str().map(|s| s.to_string()))
+        .collect();
+
+    let has_next = orgs_data["pageInfo"]["hasNextPage"]
+        .as_bool()
+        .unwrap_or(false);
+    let end_cursor = if has_next {
+        orgs_data["pageInfo"]["endCursor"]
+            .as_str()
+            .map(|s| s.to_string())
+    } else {
+        None
+    };
+
+    Ok((logins, end_cursor))
+}
+
+/// organization projects クエリからプロジェクト一覧を抽出
+pub fn extract_org_projects(response: &Value, org_login: &str) -> Result<(Vec<ProjectDto>, Option<String>), DomainError> {
+    let projects_data = &response["data"]["organization"]["projectsV2"];
+    let nodes = projects_data["nodes"]
+        .as_array()
+        .ok_or_else(|| DomainError::Api(format!("Failed to parse org projects nodes for {}", org_login)))?;
+
+    let mut projects = Vec::new();
+    let now = chrono::Utc::now().timestamp_millis();
+
+    for node in nodes {
+        let id = node["id"].as_str().unwrap_or_default().to_string();
+        let title = node["title"].as_str().unwrap_or_default().to_string();
+        let url = node["url"].as_str().unwrap_or_default().to_string();
+        let updated_at = parse_datetime_to_epoch_ms(node["updatedAt"].as_str());
+
+        projects.push(ProjectDto {
+            id,
+            owner_type: OwnerType::Organization,
+            owner_login: org_login.to_string(),
+            title,
+            url,
+            updated_at,
+            synced_at: Some(now),
+        });
+    }
+
+    let has_next = projects_data["pageInfo"]["hasNextPage"]
+        .as_bool()
+        .unwrap_or(false);
+    let end_cursor = if has_next {
+        projects_data["pageInfo"]["endCursor"]
+            .as_str()
+            .map(|s| s.to_string())
+    } else {
+        None
+    };
+
+    Ok((projects, end_cursor))
+}
+
 /// プロジェクトアイテムクエリからデータを抽出
 pub fn extract_project_items(
     response: &Value,

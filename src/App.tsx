@@ -13,6 +13,8 @@ import { ProjectPage } from './ui/pages/ProjectPage';
 import { SettingsPage } from './ui/pages/SettingsPage';
 import { PageSpinner } from './ui/components/common/Spinner';
 import { ErrorBoundary } from './ui/components/common/ErrorBoundary';
+import { ToastContainer } from './ui/components/common/Toast';
+import { ErrorDialog } from './ui/components/common/ErrorDialog';
 
 function AppContent() {
   const currentView = useSessionStore((state) => state.currentView);
@@ -74,7 +76,13 @@ function AppContent() {
 }
 
 export function App() {
-  return <AppContent />;
+  return (
+    <>
+      <AppContent />
+      <ToastContainer />
+      <ErrorDialog />
+    </>
+  );
 }
 
 export default App;

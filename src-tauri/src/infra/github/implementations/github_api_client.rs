@@ -137,25 +137,83 @@ impl GitHubPort for GitHubApiClient {
 
     async fn fetch_projects(&self, pat: &str) -> Result<Vec<ProjectDto>, DomainError> {
         let mut all_projects = Vec::new();
+
+        // 1. viewer 自身のプロジェクトを取得
         let mut after: Option<String> = None;
-
         for _ in 0..MAX_PAGINATION_PAGES {
-            let variables = json!({
-                "after": after,
-            });
-
+            let variables = json!({ "after": after });
             let response = self
                 .graphql_request(pat, queries::VIEWER_PROJECTS_QUERY, Some(variables))
                 .await?;
-
             let (projects, next_cursor) =
                 response_mapper::extract_viewer_projects(&response)?;
             all_projects.extend(projects);
-
             if next_cursor.is_none() {
                 break;
             }
             after = next_cursor;
+        }
+
+        // 2. 所属 Organization の一覧を取得
+        let mut org_logins = Vec::new();
+        let mut after: Option<String> = None;
+        for _ in 0..MAX_PAGINATION_PAGES {
+            let variables = json!({ "after": after });
+            let response = self
+                .graphql_request(pat, queries::VIEWER_ORGANIZATIONS_QUERY, Some(variables))
+                .await?;
+            let (logins, next_cursor) =
+                response_mapper::extract_viewer_organizations(&response)?;
+            org_logins.extend(logins);
+            if next_cursor.is_none() {
+                break;
+            }
+            after = next_cursor;
+        }
+
+        // 3. 各 Organization のプロジェクトを取得
+        // viewer.projectsV2 はユーザーが直接メンバーのプロジェクトのみ返す。
+        // Organization が所有するプロジェクトは organization.projectsV2 で別途取得が必要。
+        let mut seen_ids: std::collections::HashSet<String> =
+            all_projects.iter().map(|p| p.id.clone()).collect();
+
+        for org_login in &org_logins {
+            let mut after: Option<String> = None;
+            for _ in 0..MAX_PAGINATION_PAGES {
+                let variables = json!({
+                    "login": org_login,
+                    "after": after,
+                });
+                let response = match self
+                    .graphql_request(pat, queries::ORG_PROJECTS_QUERY, Some(variables))
+                    .await
+                {
+                    Ok(r) => r,
+                    Err(e @ DomainError::RateLimited { .. }) => return Err(e),
+                    Err(e) => {
+                        log::warn!("Organization '{}' のプロジェクト取得をスキップ: {}", org_login, e);
+                        break;
+                    }
+                };
+                let (projects, next_cursor) = match response_mapper::extract_org_projects(&response, org_login) {
+                    Ok(r) => r,
+                    Err(e) => {
+                        log::warn!("Organization '{}' のレスポンス解析をスキップ: {}", org_login, e);
+                        break;
+                    }
+                };
+
+                for project in projects {
+                    if seen_ids.insert(project.id.clone()) {
+                        all_projects.push(project);
+                    }
+                }
+
+                if next_cursor.is_none() {
+                    break;
+                }
+                after = next_cursor;
+            }
         }
 
         Ok(all_projects)

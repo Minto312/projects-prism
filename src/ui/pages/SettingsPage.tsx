@@ -113,7 +113,10 @@ export function SettingsPage() {
           GitHub Projects V2にアクセスするために、Personal Access Token
           (Classic)が必要です。
           <br />
-          必要なスコープ: <code className="rounded bg-gray-100 px-1">repo</code>
+          必要なスコープ:{' '}
+          <code className="rounded bg-gray-100 px-1">repo</code>{' '}
+          <code className="rounded bg-gray-100 px-1">read:org</code>{' '}
+          <code className="rounded bg-gray-100 px-1">project</code>
         </p>
 
         {hasPat ? (
@@ -202,7 +205,10 @@ export function SettingsPage() {
             </li>
             <li>「Generate new token (classic)」をクリック</li>
             <li>
-              スコープで <code className="rounded bg-gray-100 px-1">repo</code>{' '}
+              スコープで{' '}
+              <code className="rounded bg-gray-100 px-1">repo</code>、
+              <code className="rounded bg-gray-100 px-1">read:org</code>、
+              <code className="rounded bg-gray-100 px-1">project</code>{' '}
               を選択
             </li>
             <li>トークンを生成してコピー</li>
