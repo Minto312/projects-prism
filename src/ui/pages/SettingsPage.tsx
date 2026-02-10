@@ -211,7 +211,7 @@ export function SettingsPage() {
             <button
               type="button"
               onClick={() => setChannel('stable')}
-              disabled={updateStatus === 'downloading' || updateStatus === 'installing'}
+              disabled={updateStatus === 'downloading'}
               className={`rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 channel === 'stable'
                   ? 'bg-blue-600 text-white'
@@ -223,7 +223,7 @@ export function SettingsPage() {
             <button
               type="button"
               onClick={() => setChannel('nightly')}
-              disabled={updateStatus === 'downloading' || updateStatus === 'installing'}
+              disabled={updateStatus === 'downloading'}
               className={`rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                 channel === 'nightly'
                   ? 'bg-orange-500 text-white'
@@ -306,15 +306,6 @@ export function SettingsPage() {
                 <div className="h-full w-full animate-pulse rounded-full bg-blue-400" />
               )}
             </div>
-          </div>
-        )}
-
-        {updateStatus === 'installing' && (
-          <div className="mb-4 flex items-center gap-2 rounded-md bg-yellow-50 p-3">
-            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-yellow-600 border-t-transparent" />
-            <span className="text-sm font-medium text-yellow-800">
-              インストール中...
-            </span>
           </div>
         )}
 
