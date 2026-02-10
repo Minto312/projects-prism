@@ -8,17 +8,26 @@ import { DomainError, type DomainErrorCode } from './DomainError';
 
 /**
  * Rust側の #[error("...")] プレフィックスとDomainErrorCodeのマッピング
+ *
+ * Core層 DomainError の定義:
+ *   Authentication error: {0}  → UNAUTHORIZED
+ *   GitHub API error: {0}      → SYNC_FAILED
+ *   Rate limited until {..}    → RATE_LIMITED
+ *   Persistence error: {0}     → SYNC_FAILED
+ *   Conflict detected for ..   → CONFLICT_DETECTED
+ *   Not found: {0}             → TASK_NOT_FOUND
+ *   Invalid input: {0}         → INVALID_OPERATION
+ *   Network error: {0}         → NETWORK_ERROR
  */
 const ERROR_PREFIX_MAP: ReadonlyArray<[string, DomainErrorCode]> = [
   ['Authentication error', 'UNAUTHORIZED'],
   ['Rate limited', 'RATE_LIMITED'],
   ['Network error', 'NETWORK_ERROR'],
   ['Conflict detected', 'CONFLICT_DETECTED'],
-  ['Sync failed', 'SYNC_FAILED'],
-  ['Task not found', 'TASK_NOT_FOUND'],
-  ['Project not found', 'PROJECT_NOT_FOUND'],
-  ['Column not found', 'COLUMN_NOT_FOUND'],
-  ['Invalid operation', 'INVALID_OPERATION'],
+  ['GitHub API error', 'SYNC_FAILED'],
+  ['Persistence error', 'SYNC_FAILED'],
+  ['Not found', 'TASK_NOT_FOUND'],
+  ['Invalid input', 'INVALID_OPERATION'],
 ];
 
 /**
