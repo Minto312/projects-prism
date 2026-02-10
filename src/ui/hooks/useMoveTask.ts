@@ -7,6 +7,8 @@
 import { useCallback } from 'react';
 import { useBoardStore } from '../../infra/state/boardStore';
 import { getSyncAdapter } from '../../infra/sync/syncAdapter';
+import { useNotificationStore } from '../../infra/state/notificationStore';
+import { toDomainError } from '../../ui_domain/errors/parseBackendError';
 import type { Task } from '../../ui_domain/model/Task';
 import type { StatusField } from '../../ui_domain/model/Project';
 import { createMoveTaskOperation } from '../../application/usecases/moveTask';
@@ -74,7 +76,7 @@ export function useMoveTask({
         await syncAdapter.appendOperation(operationInput);
       } catch (error) {
         // エラー時はロールバック（元の位置に復元）
-        console.error('Failed to append operation:', error);
+        useNotificationStore.getState().notify(toDomainError(error));
         moveTaskInBoard(projectId, taskId, toColumnId, fromColumnId, originalIndex);
       }
     },
@@ -115,7 +117,7 @@ export function useMoveTask({
         await syncAdapter.appendOperation(operationInput);
       } catch (error) {
         // エラー時はロールバック（元の位置に復元）
-        console.error('Failed to append operation:', error);
+        useNotificationStore.getState().notify(toDomainError(error));
         moveTaskInBoard(
           projectId,
           task.id,
