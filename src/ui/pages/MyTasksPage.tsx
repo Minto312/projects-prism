@@ -6,7 +6,7 @@
 
 import { useMemo } from 'react';
 import { useMyTasks } from '../hooks/useLoadBootstrap';
-import { groupTasksByDueDate, type GroupedTasks } from '../../app/usecases/loadBootstrap';
+import { groupTasksByDueDate, type GroupedTasks } from '../../application/usecases/loadBootstrap';
 import { TaskCard } from '../components/task/TaskCard';
 import { PageSpinner } from '../components/common/Spinner';
 

@@ -7,7 +7,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from './keys';
 import { bootstrapApi } from '../tauri/client';
-import type { BootstrapResponse, ProjectBootstrapResponse } from '../../app/dtos/BootstrapDto';
+import type { BootstrapResponse, ProjectBootstrapResponse } from '../../application/dtos/BootstrapDto';
 
 /**
  * グローバル Bootstrap を取得

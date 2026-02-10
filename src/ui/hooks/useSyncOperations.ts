@@ -10,12 +10,12 @@ import { queryKeys } from '../../infra/query/keys';
 import { getSyncAdapter } from '../../infra/sync/syncAdapter';
 import { useOpQueueStore, opQueueSelectors } from '../../infra/sync/opQueueCache';
 import { useConflictStore, conflictSelectors } from '../../infra/sync/conflictStore';
-import type { SyncState, SyncResult } from '../../app/dtos/SyncDto';
+import type { SyncState, SyncResult } from '../../application/dtos/SyncDto';
 import {
   shouldSync,
   getSyncStatusMessage,
   getSyncStatusIcon,
-} from '../../app/usecases/syncOperations';
+} from '../../application/usecases/syncOperations';
 
 export interface UseSyncOperationsResult {
   syncState: SyncState | null;
