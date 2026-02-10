@@ -20,6 +20,8 @@ pub struct AppState {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             let app_dir = app
                 .path()
@@ -57,6 +59,10 @@ pub fn run() {
             interface::tauri::commands::settings::set_pat,
             interface::tauri::commands::settings::has_pat,
             interface::tauri::commands::settings::clear_pat,
+            interface::tauri::commands::updater::get_update_channel,
+            interface::tauri::commands::updater::set_update_channel,
+            interface::tauri::commands::updater::check_for_update,
+            interface::tauri::commands::updater::download_and_install_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
