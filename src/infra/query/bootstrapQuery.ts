@@ -41,6 +41,11 @@ export function useRefreshBootstrap() {
     onSuccess: (data) => {
       // キャッシュを更新
       queryClient.setQueryData(queryKeys.bootstrap.global(), data);
+      // グローバルリフレッシュでSQLiteが更新されたので、
+      // プロジェクト個別キャッシュも再取得させる
+      queryClient.invalidateQueries({
+        queryKey: [...queryKeys.bootstrap.all, 'project'],
+      });
     },
   });
 }
